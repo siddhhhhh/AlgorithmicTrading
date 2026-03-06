@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Eye, EyeOff, TrendingUp, AlertCircle, Loader2 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { Card3D, GridBackground, GlowOrb, FloatingParticles, GradientText } from '../components/ui/AceternityEffects';
 
 const LoginPage: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -13,207 +14,180 @@ const LoginPage: React.FC = () => {
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-    setIsLoading(true);
-
-    try {
-      await login(email, password);
-      navigate('/dashboard');
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Login failed');
-    } finally {
-      setIsLoading(false);
-    }
+    e.preventDefault(); setError(''); setIsLoading(true);
+    try { await login(email, password); navigate('/dashboard'); }
+    catch (err) { setError(err instanceof Error ? err.message : 'Login failed'); }
+    finally { setIsLoading(false); }
   };
 
-  const handleDemoLogin = async (userType: 'beginner' | 'pro') => {
+  const demo = async (type: 'beginner' | 'pro') => {
     setIsLoading(true);
-    try {
-      await login(
-        userType === 'beginner' ? 'demo@beginner.com' : 'demo@pro.com',
-        'demo123'
-      );
-      navigate('/dashboard');
-    } catch (err) {
-      setError('Demo login failed');
-    } finally {
-      setIsLoading(false);
-    }
+    try { await login(type === 'beginner' ? 'demo@beginner.com' : 'demo@pro.com', 'demo123'); navigate('/dashboard'); }
+    catch { setError('Demo login failed'); }
+    finally { setIsLoading(false); }
+  };
+
+  const inputStyle: React.CSSProperties = {
+    width: '100%', padding: '12px 14px', fontSize: 14, fontFamily: 'Inter, sans-serif',
+    background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
+    borderRadius: 10, color: '#fff', outline: 'none', transition: 'all .25s'
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 flex">
-      {/* Left Side - Branding */}
-      <div className="hidden lg:flex lg:w-1/2 relative">
-        <div className="flex flex-col justify-center px-12 w-full">
-          <div className="mb-8">
-            <div className="flex items-center space-x-3 mb-6">
-              <div className="w-12 h-12 bg-gradient-to-br from-blue-400 to-blue-600 rounded-xl flex items-center justify-center">
-                <TrendingUp className="h-7 w-7 text-white" />
-              </div>
-              <span className="text-3xl font-bold bg-gradient-to-r from-blue-400 to-blue-600 bg-clip-text text-transparent">
-                AlgoForge
-              </span>
-            </div>
-            <h1 className="text-4xl font-bold text-white mb-4">
-              Welcome back to the future of trading
-            </h1>
-            <p className="text-xl text-gray-300">
-              Access your strategies, monitor performance, and continue your trading journey.
-            </p>
-          </div>
+    <div style={{
+      minHeight: '100vh', display: 'flex', fontFamily: "'Inter', sans-serif",
+      background: '#030712'
+    }}>
+      {/* Left panel */}
+      <div style={{
+        flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center',
+        padding: '48px 56px', position: 'relative', overflow: 'hidden'
+      }}>
+        <GridBackground color="rgba(99,102,241,0.03)" fade />
+        <FloatingParticles count={25} color="rgba(99,102,241,0.3)" />
+        <GlowOrb color="rgba(59,130,246,0.1)" size={400} top="10%" left="20%" />
+        <GlowOrb color="rgba(139,92,246,0.08)" size={300} bottom="20%" right="10%" />
 
-          <div className="space-y-6">
-            <div className="flex items-start space-x-3">
-              <div className="w-2 h-2 bg-blue-400 rounded-full mt-2"></div>
-              <div>
-                <h3 className="text-white font-semibold">Real-time Market Data</h3>
-                <p className="text-gray-400 text-sm">Live NSE & BSE data with millisecond precision</p>
-              </div>
+        <div style={{ position: 'relative', zIndex: 1, maxWidth: 420 }}>
+          <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none', marginBottom: 56 }}>
+            <div style={{
+              width: 40, height: 40, borderRadius: 10,
+              background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              boxShadow: '0 0 20px rgba(59,130,246,0.4)'
+            }}>
+              <TrendingUp size={20} color="#fff" />
             </div>
-            <div className="flex items-start space-x-3">
-              <div className="w-2 h-2 bg-green-400 rounded-full mt-2"></div>
-              <div>
-                <h3 className="text-white font-semibold">Advanced Analytics</h3>
-                <p className="text-gray-400 text-sm">Professional-grade risk management and portfolio optimization</p>
+            <span style={{ fontSize: 22, fontWeight: 800, color: '#fff', letterSpacing: -0.5 }}>AlgoForge</span>
+          </Link>
+
+          <h1 className="animate-in" style={{ fontSize: 38, fontWeight: 800, color: '#fff', lineHeight: 1.15, letterSpacing: -1, marginBottom: 16 }}>
+            Welcome back to<br /><GradientText>intelligent trading</GradientText>
+          </h1>
+          <p className="animate-in delay-1" style={{ fontSize: 16, color: '#64748b', lineHeight: 1.6, marginBottom: 48 }}>
+            Access your strategies, run backtests on Nifty 50 data, and monitor the Indian market in real-time.
+          </p>
+
+          <div className="animate-in delay-2" style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+            {[
+              { dot: '#3b82f6', title: 'Real-time NSE/BSE Data', desc: 'Live indices and Nifty 50 stocks' },
+              { dot: '#059669', title: 'Advanced Backtesting', desc: 'Test strategies with real historical data' },
+              { dot: '#8b5cf6', title: 'No-Code Builder', desc: 'Build strategies without programming' },
+            ].map(f => (
+              <div key={f.title} style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+                <div style={{
+                  width: 8, height: 8, borderRadius: '50%', background: f.dot, marginTop: 6, flexShrink: 0,
+                  boxShadow: `0 0 10px ${f.dot}50`
+                }} />
+                <div>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: '#e2e8f0' }}>{f.title}</div>
+                  <div style={{ fontSize: 13, color: '#475569' }}>{f.desc}</div>
+                </div>
               </div>
-            </div>
-            <div className="flex items-start space-x-3">
-              <div className="w-2 h-2 bg-purple-400 rounded-full mt-2"></div>
-              <div>
-                <h3 className="text-white font-semibold">AI-Powered Insights</h3>
-                <p className="text-gray-400 text-sm">Get personalized trading recommendations and market analysis</p>
-              </div>
-            </div>
+            ))}
           </div>
         </div>
       </div>
 
-      {/* Right Side - Login Form */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center px-6 py-12">
-        <div className="w-full max-w-md">
-          {/* Mobile Logo */}
-          <div className="lg:hidden flex items-center justify-center space-x-2 mb-8">
-            <div className="w-10 h-10 bg-gradient-to-br from-blue-400 to-blue-600 rounded-lg flex items-center justify-center">
-              <TrendingUp className="h-6 w-6 text-white" />
-            </div>
-            <span className="text-2xl font-bold bg-gradient-to-r from-blue-400 to-blue-600 bg-clip-text text-transparent">
-              AlgoForge
-            </span>
+      {/* Right form (3D card) */}
+      <div style={{
+        width: 500, display: 'flex', alignItems: 'center', justifyContent: 'center',
+        padding: '40px 48px', position: 'relative',
+        borderLeft: '1px solid rgba(255,255,255,0.05)'
+      }}>
+        <GlowOrb color="rgba(99,102,241,0.06)" size={300} top="30%" left="-20%" animate={false} />
+
+        <Card3D intensity={6} glare={true} style={{ width: '100%', maxWidth: 400, padding: 32 }}>
+          <div style={{ marginBottom: 28 }}>
+            <h2 style={{ fontSize: 24, fontWeight: 700, color: '#fff', marginBottom: 6 }}>Sign in</h2>
+            <p style={{ fontSize: 14, color: '#475569' }}>Enter your credentials to continue</p>
           </div>
 
-          <div className="bg-white/10 backdrop-blur-lg border border-white/20 rounded-2xl p-8">
-            <div className="text-center mb-8">
-              <h2 className="text-2xl font-bold text-white mb-2">Sign in to your account</h2>
-              <p className="text-gray-300">Continue your trading journey</p>
+          {error && (
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px',
+              background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)',
+              borderRadius: 10, marginBottom: 20, fontSize: 13, color: '#f87171'
+            }}>
+              <AlertCircle size={15} /> {error}
+            </div>
+          )}
+
+          <form onSubmit={handleSubmit}>
+            <div style={{ marginBottom: 18 }}>
+              <label style={{ display: 'block', fontSize: 13, fontWeight: 500, color: '#94a3b8', marginBottom: 6 }}>Email</label>
+              <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@example.com" required style={inputStyle}
+                onFocus={e => { e.target.style.borderColor = '#6366f1'; e.target.style.boxShadow = '0 0 0 3px rgba(99,102,241,0.15), 0 0 20px rgba(99,102,241,0.1)'; }}
+                onBlur={e => { e.target.style.borderColor = 'rgba(255,255,255,0.1)'; e.target.style.boxShadow = 'none'; }}
+              />
             </div>
 
-            {error && (
-              <div className="bg-red-500/20 border border-red-500/30 rounded-lg p-3 mb-6 flex items-center space-x-2">
-                <AlertCircle className="h-5 w-5 text-red-400" />
-                <span className="text-red-400 text-sm">{error}</span>
-              </div>
-            )}
-
-            <form onSubmit={handleSubmit} className="space-y-6">
-              <div>
-                <label htmlFor="email" className="block text-sm font-medium text-gray-300 mb-2">
-                  Email Address
-                </label>
-                <input
-                  id="email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-3 text-white placeholder-gray-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors"
-                  placeholder="Enter your email"
-                  required
+            <div style={{ marginBottom: 18 }}>
+              <label style={{ display: 'block', fontSize: 13, fontWeight: 500, color: '#94a3b8', marginBottom: 6 }}>Password</label>
+              <div style={{ position: 'relative' }}>
+                <input type={showPassword ? 'text' : 'password'} value={password}
+                  onChange={e => setPassword(e.target.value)} placeholder="Enter password" required
+                  style={{ ...inputStyle, paddingRight: 44 }}
+                  onFocus={e => { e.target.style.borderColor = '#6366f1'; e.target.style.boxShadow = '0 0 0 3px rgba(99,102,241,0.15), 0 0 20px rgba(99,102,241,0.1)'; }}
+                  onBlur={e => { e.target.style.borderColor = 'rgba(255,255,255,0.1)'; e.target.style.boxShadow = 'none'; }}
                 />
-              </div>
-
-              <div>
-                <label htmlFor="password" className="block text-sm font-medium text-gray-300 mb-2">
-                  Password
-                </label>
-                <div className="relative">
-                  <input
-                    id="password"
-                    type={showPassword ? 'text' : 'password'}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-3 pr-12 text-white placeholder-gray-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors"
-                    placeholder="Enter your password"
-                    required
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white transition-colors"
-                  >
-                    {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                  </button>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between">
-                <label className="flex items-center space-x-2 text-sm">
-                  <input type="checkbox" className="rounded border-white/20 bg-white/10" />
-                  <span className="text-gray-300">Remember me</span>
-                </label>
-                <Link to="/forgot-password" className="text-sm text-blue-400 hover:text-blue-300 transition-colors">
-                  Forgot password?
-                </Link>
-              </div>
-
-              <button
-                type="submit"
-                disabled={isLoading}
-                className="w-full bg-gradient-to-r from-blue-500 to-blue-600 text-white py-3 rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all duration-200 transform hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
-              >
-                {isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : null}
-                <span>{isLoading ? 'Signing in...' : 'Sign In'}</span>
-              </button>
-            </form>
-
-            <div className="mt-6">
-              <div className="relative">
-                <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-white/20"></div>
-                </div>
-                <div className="relative flex justify-center text-sm">
-                  <span className="px-2 bg-slate-900/50 text-gray-400">Or try demo accounts</span>
-                </div>
-              </div>
-
-              <div className="mt-4 grid grid-cols-2 gap-3">
-                <button
-                  onClick={() => handleDemoLogin('beginner')}
-                  disabled={isLoading}
-                  className="border border-white/20 text-white py-2 px-4 rounded-lg hover:bg-white/10 transition-all duration-200 text-sm disabled:opacity-50"
-                >
-                  Beginner Demo
-                </button>
-                <button
-                  onClick={() => handleDemoLogin('pro')}
-                  disabled={isLoading}
-                  className="border border-white/20 text-white py-2 px-4 rounded-lg hover:bg-white/10 transition-all duration-200 text-sm disabled:opacity-50"
-                >
-                  Pro Demo
+                <button type="button" onClick={() => setShowPassword(!showPassword)} style={{
+                  position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)',
+                  background: 'none', border: 'none', cursor: 'pointer', color: '#475569', padding: 2
+                }}>
+                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
               </div>
             </div>
 
-            <div className="mt-8 text-center">
-              <p className="text-gray-300">
-                Don't have an account?{' '}
-                <Link to="/register" className="text-blue-400 hover:text-blue-300 transition-colors font-medium">
-                  Sign up for free
-                </Link>
-              </p>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#64748b', cursor: 'pointer' }}>
+                <input type="checkbox" style={{ accentColor: '#6366f1' }} /> Remember me
+              </label>
+              <a href="#" style={{ fontSize: 13, color: '#818cf8', textDecoration: 'none' }}>Forgot password?</a>
             </div>
+
+            <button type="submit" disabled={isLoading} style={{
+              width: '100%', padding: '12px 0', fontSize: 15, fontWeight: 600, color: '#fff',
+              background: 'linear-gradient(135deg, #3b82f6, #6366f1)', border: 'none',
+              borderRadius: 10, cursor: isLoading ? 'not-allowed' : 'pointer',
+              opacity: isLoading ? 0.7 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+              boxShadow: '0 0 25px rgba(99,102,241,0.4), 0 4px 12px rgba(59,130,246,0.25)',
+              transition: 'all .25s'
+            }}
+              onMouseEnter={e => { if (!isLoading) { e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.boxShadow = '0 0 40px rgba(99,102,241,0.5), 0 8px 20px rgba(59,130,246,0.3)'; } }}
+              onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = '0 0 25px rgba(99,102,241,0.4), 0 4px 12px rgba(59,130,246,0.25)'; }}
+            >
+              {isLoading ? <Loader2 size={16} style={{ animation: 'spin .7s linear infinite' }} /> : null}
+              {isLoading ? 'Signing in…' : 'Sign In'}
+            </button>
+          </form>
+
+          {/* Divider */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '24px 0' }}>
+            <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.06)' }} />
+            <span style={{ fontSize: 12, color: '#334155' }}>or try demo</span>
+            <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.06)' }} />
           </div>
-        </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            {(['beginner', 'pro'] as const).map(t => (
+              <button key={t} onClick={() => demo(t)} disabled={isLoading} style={{
+                padding: '10px 0', fontSize: 13, fontWeight: 500, color: '#94a3b8',
+                background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)',
+                borderRadius: 10, cursor: isLoading ? 'not-allowed' : 'pointer', transition: 'all .2s'
+              }}
+                onMouseEnter={e => { e.currentTarget.style.background = 'rgba(99,102,241,0.08)'; e.currentTarget.style.borderColor = 'rgba(99,102,241,0.2)'; e.currentTarget.style.color = '#c7d2fe'; }}
+                onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.03)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)'; e.currentTarget.style.color = '#94a3b8'; }}
+              >{t === 'beginner' ? 'Beginner' : 'Pro'} Demo</button>
+            ))}
+          </div>
+
+          <p style={{ textAlign: 'center', marginTop: 24, fontSize: 14, color: '#475569' }}>
+            Don't have an account?{' '}
+            <Link to="/register" style={{ color: '#818cf8', textDecoration: 'none', fontWeight: 500 }}>Sign up free</Link>
+          </p>
+        </Card3D>
       </div>
     </div>
   );

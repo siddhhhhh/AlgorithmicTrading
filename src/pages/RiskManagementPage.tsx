@@ -1,413 +1,388 @@
-import React, { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import DashboardLayout from '../components/layout/DashboardLayout';
-import {
-  Shield, BarChart3, PieChart, Zap, Download, Info, Sparkles, UserCheck
-} from 'lucide-react';
+import { Download, Info, Sparkles, Shield, TrendingDown, Activity, Zap } from 'lucide-react';
+import { MovingBorderCard, AnimatedCounter, HoverGlowCard, TextShimmer, TiltReveal, PulseBeacon } from '../components/ui/AceternityEffects';
 
-// ---------- Utilities & Mock Data ----------
-function computeRiskScore({
-  var95, maxDrawdown, sharpe, beta, sortino, volatility, largestWeight
-}: { var95: number, maxDrawdown: number, sharpe: number, beta: number, sortino: number, volatility: number, largestWeight: number }) {
+// ── Data ──────────────────────────────────────────────────────────────────────
+function computeRiskScore({ var95, maxDrawdown, sharpe, beta, sortino, volatility, largestWeight }:
+  { var95: number; maxDrawdown: number; sharpe: number; beta: number; sortino: number; volatility: number; largestWeight: number }) {
   let score = 0;
-  score += Math.min(var95 / 2000, 25);
-  score += Math.min(Math.abs(maxDrawdown) / 0.25, 15);
-  score += Math.min(volatility * 1.2, 10);
-  score += Math.max(0, (beta - 1) * 12);
-  score += Math.max(0, (largestWeight - 15) * 1.5);
-  score -= Math.max(0, (sharpe - 1) * 15);
+  score += Math.min(var95 / 2000, 25); score += Math.min(Math.abs(maxDrawdown) / 0.25, 15);
+  score += Math.min(volatility * 1.2, 10); score += Math.max(0, (beta - 1) * 12);
+  score += Math.max(0, (largestWeight - 15) * 1.5); score -= Math.max(0, (sharpe - 1) * 15);
   score -= Math.max(0, (sortino - 1) * 10);
   return Math.round(Math.min(100, Math.max(0, score + 50)));
 }
-function riskLevel(score: number) {
-  if(score < 50) return ["Low Risk", "text-green-600", "bg-green-100"];
-  if(score < 70) return ["Medium Risk", "text-yellow-600", "bg-yellow-100"];
-  return ["High Risk", "text-red-600", "bg-red-100"];
-}
-const getRiskColor = (score: number) => score <= 30 ? 'text-green-600' : score <= 70 ? 'text-yellow-600' : 'text-red-600';
-const initialPositions = [
+
+const positions = [
   { symbol: 'RELIANCE', name: 'Reliance Industries', value: 174000, weight: 18.5, var: 4200, beta: 0.87, sharpe: 0.95, sortino: 1.1, alpha: 1.9, vol: 21, riskScore: 72 },
   { symbol: 'TCS', name: 'Tata Consultancy', value: 135000, weight: 14.3, var: 2100, beta: 0.92, sharpe: 0.82, sortino: 0.98, alpha: 1.3, vol: 18, riskScore: 68 },
   { symbol: 'HDFCBANK', name: 'HDFC Bank', value: 120000, weight: 12.8, var: 2800, beta: 1.23, sharpe: 0.75, sortino: 0.91, alpha: -0.4, vol: 25, riskScore: 75 },
-  { symbol: 'INFOSYS', name: 'Infosys Ltd', value: 98000, weight: 10.4, var: 1500, beta: 1.05, sharpe: 0.79, sortino: 0.99, alpha: 0.5, vol: 19, riskScore: 65 }
+  { symbol: 'INFOSYS', name: 'Infosys Ltd', value: 98000, weight: 10.4, var: 1500, beta: 1.05, sharpe: 0.79, sortino: 0.99, alpha: 0.5, vol: 19, riskScore: 65 },
 ];
-const defaultPortfolio = {
-  value: 941000, var95: 15450, var99: 23800, beta: 1.08, sharpe: 0.92, alpha: 1.2,
-  sortino: 1.01, volatility: 18.6, maxDrawdown: -7.3, streak: 6, score: 70
+
+const defaultPortfolio = { value: 941000, var95: 15450, var99: 23800, beta: 1.08, sharpe: 0.92, alpha: 1.2, sortino: 1.01, volatility: 18.6, maxDrawdown: -7.3, streak: 6 };
+const scenarioEffects: Record<string, any> = {
+  none: { var95: 15450, sharpe: 0.92, beta: 1.08, alpha: 1.2, sortino: 1.01, volatility: 18.6, maxDrawdown: -7.3 },
+  fall: { var95: 21240, sharpe: 0.71, beta: 1.22, alpha: -0.4, sortino: 0.72, volatility: 22.3, maxDrawdown: -13.9 },
+  vol: { var95: 19100, sharpe: 0.87, beta: 1.14, alpha: 0.6, sortino: 0.89, volatility: 21.7, maxDrawdown: -11.2 },
 };
-const scenarioEffects = {
-  "none": { var95: 15450, sharpe: 0.92, beta: 1.08, alpha: 1.2, sortino: 1.01, volatility: 18.6, maxDrawdown: -7.3, score: 70 },
-  "fall": { var95: 21240, sharpe: 0.71, beta: 1.22, alpha: -0.4, sortino: 0.72, volatility: 22.3, maxDrawdown: -13.9, score: 84 },
-  "vol":  { var95: 19100, sharpe: 0.87, beta: 1.14, alpha: 0.6, sortino: 0.89, volatility: 21.7, maxDrawdown: -11.2, score: 77 }
-};
-const sampleMonteCarlo = [
-  ["<-10%", 7], ["-10%/-5%", 25], ["-5%/0%", 152], ["0%/5%", 503], ["5%/10%", 234], [">10%", 59]
+
+const monteCarloData = [
+  { bucket: '<-10%', count: 7, color: '#ef4444' }, { bucket: '-10/-5%', count: 25, color: '#f97316' },
+  { bucket: '-5/0%', count: 152, color: '#eab308' }, { bucket: '0/5%', count: 503, color: '#22c55e' },
+  { bucket: '5/10%', count: 234, color: '#3b82f6' }, { bucket: '>10%', count: 59, color: '#8b5cf6' },
 ];
-const leaderboard = [
-  { user: "Priya", sharpe: 1.49 },
-  { user: "Ajay", sharpe: 1.21 },
-  { user: "You", sharpe: 0.92 }
-];
+
 const metricExplainers: Record<string, string> = {
-  var95: "VaR (Value at Risk) estimates the most you're likely to lose in a day in 95% of cases.",
-  var99: "VaR (99%) is more conservative: ~1 in 100 chance of losing more than this.",
-  sharpe: "Sharpe ratio measures risk-adjusted return (>1 is strong).",
-  beta: "Beta shows portfolio's sensitivity to the overall market (1.0 = neutral).",
-  alpha: "Alpha is your portfolio's outperformance over the benchmark.",
-  sortino: "Sortino ratio only penalizes downside risk (high = better).",
-  volatility: "Volatility is fluctuation in returns (lower is safer)."
+  var95: "Value at Risk: max expected daily loss in 95% of cases.",
+  var99: "VaR 99%: ~1 in 100 chance of losing more than this.",
+  sharpe: "Sharpe measures risk-adjusted return (>1 is strong).",
+  beta: "Beta = market sensitivity. 1.0 = neutral, >1 = amplified.",
+  alpha: "Alpha = excess return over benchmark.",
+  sortino: "Sortino only penalizes downside risk (higher = better).",
+  volatility: "Annualized fluctuation in returns (lower = safer).",
 };
 
-// ---------- Main Component ----------
-const RiskManagementPage: React.FC = () => {
-  const [positions, setPositions] = useState(initialPositions);
-  const [editing, setEditing] = useState<{symbol?: string, field?: string} | null>(null);
-  const [editValue, setEditValue] = useState('');
-  const [scenario, setScenario] = useState<"none"|"fall"|"vol">("none");
-  const [education, setEducation] = useState<string | null>(null);
-  const [showRiskExplain, setShowRiskExplain] = useState(false);
-  const portfolio = { ...defaultPortfolio, ...(scenario !== "none" ? scenarioEffects[scenario] : {}) };
+// ── Animated Risk Gauge (light theme) ─────────────────────────────────────────
+const RiskGauge = ({ score, size = 180 }: { score: number; size?: number }) => {
+  const [animScore, setAnimScore] = useState(0);
+  useEffect(() => { const t = setTimeout(() => setAnimScore(score), 200); return () => clearTimeout(t); }, [score]);
+  const r = size * 0.37, cx = size / 2, cy = size / 2, circumference = 2 * Math.PI * r;
+  const offset = circumference * (1 - animScore / 100);
+  const color = animScore < 40 ? '#10b981' : animScore < 65 ? '#f59e0b' : '#ef4444';
 
-  const riskScore = computeRiskScore({
-    var95: portfolio.var95,
-    maxDrawdown: portfolio.maxDrawdown ?? -8,
-    sharpe: portfolio.sharpe,
-    beta: portfolio.beta,
-    sortino: portfolio.sortino,
-    volatility: portfolio.volatility,
-    largestWeight: positions.length ? Math.max(...positions.map(p=>p.weight)) : 0
-  });
-  const [riskLabel, riskTextColor, riskBgColor] = riskLevel(riskScore);
-
-  const maxRisk = Math.max(
-    portfolio.var95/2000,
-    Math.abs(portfolio.maxDrawdown)/0.25,
-    portfolio.volatility*1.2,
-    Math.max(0, (portfolio.beta-1)*12),
-    Math.max(0, (positions.length ? Math.max(...positions.map(p=>p.weight))-15 : 0)*1.5)
+  return (
+    <div style={{ position: 'relative', width: size, height: size }}>
+      <svg width={size} height={size} style={{ transform: 'rotate(-90deg)' }}>
+        <defs>
+          <linearGradient id="riskGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor={color} stopOpacity="0.2" />
+            <stop offset="100%" stopColor={color} />
+          </linearGradient>
+          <filter id="gaugeShadow"><feDropShadow dx="0" dy="0" stdDeviation="4" floodColor={color} floodOpacity="0.4" /></filter>
+        </defs>
+        <circle cx={cx} cy={cy} r={r} stroke="#f1f5f9" strokeWidth={size * 0.055} fill="none" />
+        <circle cx={cx} cy={cy} r={r} stroke="url(#riskGrad)" strokeWidth={size * 0.055} fill="none"
+          strokeDasharray={circumference} strokeDashoffset={offset} strokeLinecap="round" filter="url(#gaugeShadow)"
+          style={{ transition: 'stroke-dashoffset 1.5s cubic-bezier(0.4,0,0.2,1)' }} />
+      </svg>
+      <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+        <span style={{ fontSize: size * 0.25, fontWeight: 800, color, lineHeight: 1 }}>{animScore}</span>
+        <span style={{ fontSize: 10, fontWeight: 600, color: '#94a3b8', marginTop: 4, textTransform: 'uppercase', letterSpacing: 1.5 }}>
+          {animScore < 40 ? 'Low Risk' : animScore < 65 ? 'Medium' : 'High Risk'}
+        </span>
+      </div>
+    </div>
   );
-  const mainDriver =
-    maxRisk===portfolio.var95/2000 ? "Value at Risk" :
-    maxRisk===Math.abs(portfolio.maxDrawdown)/0.25 ? "Max Drawdown" :
-    maxRisk===portfolio.volatility*1.2 ? "Volatility" :
-    maxRisk===(positions.length ? Math.max(...positions.map(p=>p.weight))-15 : 0)*1.5 ? "Concentration (>15%)" :
-    maxRisk===Math.max(0, (portfolio.beta-1)*12) ? "Beta (market risk)" : "Sharpe/Sortino";
+};
 
-  const suggestions = [
-    portfolio.sharpe < 1 ? "Sharpe ratio is low: reduce HDFCBANK or add hedge to boost risk-adjusted returns." : "Sharpe ratio is healthy.",
-    positions.some(pos => pos.weight > 18) ? "Trim Reliance to lower concentration risk." : "Concentration ok.",
-    portfolio.beta > 1.1 ? "Beta is high: Portfolio will suffer if market drops, add defensive stocks." : "Beta ok.",
-    positions.some(pos => pos.riskScore > 70) ? "Some positions are high risk — try reducing weight or hedging those stocks." : "No high-risk exposures."
-  ];
+// ── Animated Bar ──────────────────────────────────────────────────────────────
+const AnimatedBar = ({ height, color, delay, label, value }: { height: number; color: string; delay: number; label: string; value: number }) => {
+  const [h, setH] = useState(0);
+  useEffect(() => { const t = setTimeout(() => setH(height), delay); return () => clearTimeout(t); }, [height, delay]);
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1, minWidth: 40 }}>
+      <span style={{ fontSize: 10, fontWeight: 700, color: '#64748b', marginBottom: 4 }}>{value}</span>
+      <div style={{ width: '100%', maxWidth: 32, height: 110, display: 'flex', alignItems: 'flex-end', borderRadius: '6px 6px 0 0' }}>
+        <div style={{
+          width: '100%', height: h, background: `linear-gradient(180deg, ${color}, ${color}88)`, borderRadius: '6px 6px 0 0',
+          transition: 'height 0.8s cubic-bezier(0.4,0,0.2,1)', transitionDelay: `${delay}ms`, boxShadow: `0 -2px 12px ${color}25`, minHeight: 4
+        }} />
+      </div>
+      <span style={{ fontSize: 9, color: '#94a3b8', marginTop: 6, textAlign: 'center', lineHeight: 1.2 }}>{label}</span>
+    </div>
+  );
+};
 
-  const startEdit = (symbol: string, field: string, value: number) => { setEditing({symbol, field}); setEditValue(value.toString()); };
-  const saveEdit = () => {
-    if (editing && editValue) {
-      const newVal = parseFloat(editValue);
-      const updated = positions.map(pos =>
-        (pos.symbol === editing.symbol)
-        ? { ...pos, [editing.field!]: newVal }
-        : pos
-      );
-      setPositions(updated); setEditing(null); setEditValue('');
-    }
-  };
-  const removePosition = (symbol: string) =>
-    setPositions(positions.filter(p => p.symbol !== symbol));
+// ── Drawdown Chart ────────────────────────────────────────────────────────────
+const DrawdownChart = () => {
+  const points = [0, -1.2, -0.8, -2.5, -3.1, -1.9, -4.2, -7.3, -5.1, -3.8, -2.1, -0.5, -1.8, -3.2, -2.0, -0.3];
+  const W = 300, H = 80;
+  const minV = Math.min(...points), range = 0 - minV || 1;
+  const pathPoints = points.map((v, i) => `${(i / (points.length - 1)) * W},${H - ((v - minV) / range) * H}`).join(' ');
+  const areaPath = `M0,${H} L${pathPoints.split(' ').map(p => p).join(' L')} L${W},${H} Z`;
+  const worstIdx = points.indexOf(Math.min(...points));
+  const wx = (worstIdx / (points.length - 1)) * W;
+  const wy = H - ((points[worstIdx] - minV) / range) * H;
+
+  return (
+    <svg width="100%" viewBox={`0 0 ${W} ${H + 16}`} preserveAspectRatio="none" style={{ overflow: 'visible' }}>
+      <defs>
+        <linearGradient id="ddGrad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#ef4444" stopOpacity="0.2" /><stop offset="100%" stopColor="#ef4444" stopOpacity="0.02" />
+        </linearGradient>
+      </defs>
+      <path d={areaPath} fill="url(#ddGrad)" />
+      <polyline points={pathPoints} fill="none" stroke="#ef4444" strokeWidth="2" strokeLinejoin="round" />
+      <circle cx={wx} cy={wy} r="4" fill="#ef4444"><animate attributeName="r" values="3;5;3" dur="2s" repeatCount="indefinite" /></circle>
+      <text x={wx} y={wy - 8} textAnchor="middle" fill="#ef4444" fontSize="10" fontWeight="700">{points[worstIdx]}%</text>
+    </svg>
+  );
+};
+
+// ── Main Component ────────────────────────────────────────────────────────────
+const RiskManagementPage = () => {
+  const [scenario, setScenario] = useState<'none' | 'fall' | 'vol'>('none');
+  const [education, setEducation] = useState<string | null>(null);
+  const portfolio = { ...defaultPortfolio, ...(scenario !== 'none' ? scenarioEffects[scenario] : {}) };
+  const riskScore = computeRiskScore({
+    var95: portfolio.var95, maxDrawdown: portfolio.maxDrawdown ?? -8, sharpe: portfolio.sharpe,
+    beta: portfolio.beta, sortino: portfolio.sortino, volatility: portfolio.volatility,
+    largestWeight: Math.max(...positions.map((p: any) => p.weight))
+  });
+
+  const maxMC = Math.max(...monteCarloData.map(d => d.count));
 
   return (
     <DashboardLayout>
       <div className="p-6 max-w-7xl mx-auto">
 
-        {/* HEADER */}
-        <div className="flex flex-wrap items-center justify-between mb-6 gap-4">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900 mb-0.5">Risk Management</h1>
-            <p className="text-gray-600">Portfolio risk, analytics, scenarios, and improvement suggestions.</p>
-          </div>
-          <div className="flex items-center space-x-3 text-sm">
-            <span className="text-gray-500">Last updated: 2:45 PM</span>
-            <button className="flex items-center px-3 py-1 rounded bg-blue-100 text-blue-600 hover:bg-blue-200">
-              <Download className="w-4 h-4 mr-2" />Export Report
+        {/* ── Hero Banner ──────────────────────────────────── */}
+        <div style={{
+          background: 'linear-gradient(135deg, #1e1b4b 0%, #581c87 40%, #7c2d12 100%)',
+          borderRadius: 20, padding: '28px 32px', color: '#fff', marginBottom: 28, position: 'relative', overflow: 'hidden',
+        }}>
+          <div style={{ position: 'absolute', right: -60, top: -60, width: 250, height: 250, borderRadius: '50%', background: 'rgba(255,255,255,0.03)', filter: 'blur(40px)' }} />
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'relative', zIndex: 1, flexWrap: 'wrap', gap: 16 }}>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+                <Shield size={20} />
+                <TextShimmer baseColor="#fff" shimmerColor="#c084fc" style={{ fontSize: 22, fontWeight: 800 }}>Risk Management</TextShimmer>
+              </div>
+              <p style={{ fontSize: 13, opacity: 0.6 }}>Real-time portfolio risk analytics with scenario simulations & AI-powered suggestions.</p>
+            </div>
+            <button style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 20px', borderRadius: 12, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', color: '#fff', cursor: 'pointer', fontSize: 13, fontWeight: 500, transition: 'all 0.25s' }}
+              onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.18)'; }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.08)'; }}>
+              <Download size={14} /> Export Report
             </button>
           </div>
         </div>
 
-        {/* OVERALL RISK SCORE CARD */}
-        <div className={`flex flex-wrap items-center justify-between gap-8 p-8 rounded-2xl shadow border-2 ${riskBgColor} mb-10`}>
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="text-lg font-extrabold text-gray-800">Portfolio Risk Score</span>
-              <button className="text-xs underline text-blue-600" onClick={()=>setShowRiskExplain(v=>!v)}>How is this calculated?</button>
-            </div>
-            <div className={`text-2xl font-bold ${riskTextColor}`}>{riskScore}/100 <span className="ml-2 text-lg font-medium">{riskLabel}</span></div>
-            {showRiskExplain && (
-              <div className="mt-2 bg-white px-3 py-2 rounded shadow text-xs text-gray-700 w-[20rem] max-w-full">
-                The score weights several metrics (VaR, drawdown, Sharpe, beta, volatility, concentration).
-                <br/>
-                <span className="font-bold text-sm">{mainDriver}</span> is contributing the most to your current risk.
-                <br />
-                Lower VaR, drawdown, volatility, beta, or concentration, and higher Sharpe/Sortino will improve the score.
-                <button onClick={()=>setShowRiskExplain(false)} className="block mt-2 text-right w-full text-xs text-blue-500">✕ close</button>
+        {/* ── Risk Score + Metrics ──────────────────────────── */}
+        <div style={{ display: 'grid', gridTemplateColumns: '220px 1fr', gap: 24, marginBottom: 28 }}>
+          {/* Risk Gauge — MovingBorderCard (NEW effect!) */}
+          <MovingBorderCard borderColor={riskScore < 40 ? '#10b981' : riskScore < 65 ? '#f59e0b' : '#ef4444'} duration={3}>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '24px 16px', background: '#fff', borderRadius: 15 }}>
+              <RiskGauge score={riskScore} />
+              <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 8 }}>Portfolio Risk Score</div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: '#1e293b' }}>
+                <AnimatedCounter target={riskScore} suffix="/100" style={{ fontSize: 14, fontWeight: 700, color: '#1e293b' }} />
               </div>
-            )}
-          </div>
-          <div className="relative w-24 h-24 flex flex-col items-center">
-            <svg className="w-24 h-24 rotate-[135deg]">
-              <circle cx="48" cy="48" r="38" stroke="#e5e7eb" strokeWidth="8" fill="none" />
-              <circle
-                cx="48" cy="48" r="38"
-                stroke={riskScore < 50 ? "#10b981" : riskScore < 70 ? "#f59e0b" : "#ef4444"}
-                strokeWidth="8"
-                fill="none"
-                strokeDasharray={`${2 * Math.PI * 38}`}
-                strokeDashoffset={`${2 * Math.PI * 38 * (1 - riskScore / 100)}`}
-                className="transition-all duration-300"
-                style={{transition:'stroke-dashoffset 0.5s'}}
-              />
-            </svg>
-            <span className={`absolute inset-0 flex items-center justify-center text-3xl font-bold ${riskTextColor}`}>{riskScore}</span>
-          </div>
-        </div>
+            </div>
+          </MovingBorderCard>
 
-        {/* METRICS GRID + EDUCATION LAYER */}
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-5 mb-10">
-          {[
-            {key: 'var95', label: 'VaR 95%', val: `₹${portfolio.var95.toLocaleString()}`},
-            {key: 'var99', label: 'VaR 99%', val: `₹${portfolio.var99.toLocaleString()}`},
-            {key: 'sharpe', label: 'Sharpe', val: portfolio.sharpe.toFixed(2)},
-            {key: 'sortino', label: 'Sortino', val: portfolio.sortino.toFixed(2)},
-            {key: 'beta', label: 'Beta', val: portfolio.beta.toFixed(2)},
-            {key: 'alpha', label: 'Alpha', val: portfolio.alpha.toFixed(2)},
-            {key: 'volatility', label: 'Volatility', val: `${portfolio.volatility.toFixed(2)}%`}
-          ].map(({key, label, val}) => (
-            <div key={key} className="bg-white rounded-xl shadow border border-gray-200 p-5 flex flex-col text-center items-center relative">
-              <span className="flex items-center text-xs text-gray-500 mb-1">
-                {label}
-                <button onClick={() => setEducation(key)}><Info className="w-3.5 h-3.5 ml-1 text-blue-300" /></button>
-              </span>
-              <span className="text-lg font-bold">{val}</span>
-              {education === key && (
-                <div className="absolute z-40 bg-white border rounded shadow-md p-3 text-gray-800 text-xs top-12 left-1/2 -translate-x-1/2 w-56">
-                  {metricExplainers[key]}
-                  <button className="absolute top-1 right-2 text-xs text-blue-500" onClick={() => setEducation(null)}>✕</button>
+          {/* Metric Cards — HoverGlowCard (NEW effect!) */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(135px, 1fr))', gap: 12, alignContent: 'start' }}>
+            {[
+              { key: 'var95', label: 'VaR 95%', val: `₹${portfolio.var95.toLocaleString()}`, glow: '#ef4444' },
+              { key: 'var99', label: 'VaR 99%', val: `₹${portfolio.var99.toLocaleString()}`, glow: '#f97316' },
+              { key: 'sharpe', label: 'Sharpe Ratio', val: portfolio.sharpe.toFixed(2), glow: '#3b82f6' },
+              { key: 'sortino', label: 'Sortino Ratio', val: portfolio.sortino.toFixed(2), glow: '#8b5cf6' },
+              { key: 'beta', label: 'Beta', val: portfolio.beta.toFixed(2), glow: '#eab308' },
+              { key: 'alpha', label: 'Alpha', val: portfolio.alpha.toFixed(2), glow: '#10b981' },
+              { key: 'volatility', label: 'Volatility', val: `${portfolio.volatility.toFixed(1)}%`, glow: '#06b6d4' },
+            ].map(m => (
+              <HoverGlowCard key={m.key} glowColor={m.glow} style={{ padding: 16, cursor: 'pointer', position: 'relative' }}
+                onClick={() => setEducation(education === m.key ? null : m.key)}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 6 }}>
+                  <PulseBeacon color={m.glow} size={5} />
+                  <span style={{ fontSize: 10, fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 0.8 }}>{m.label}</span>
+                  <Info size={10} style={{ color: '#cbd5e1' }} />
                 </div>
-              )}
-            </div>
-          ))}
-        </div>
-
-        {/* SCENARIO BEFORE/AFTER */}
-        <div className="bg-white rounded-2xl shadow border p-8 mb-10">
-          <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-            <div className="flex items-center gap-2 mb-2 sm:mb-0">
-              <Sparkles className="h-5 w-5 text-indigo-400" />
-              <span className="font-semibold text-lg">What-If Scenarios:</span>
-            </div>
-            <div className="flex gap-4 flex-wrap ml-2">
-              <button className={`px-4 py-1 rounded-full font-semibold ${scenario === "none" ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-700"}`} onClick={()=>setScenario("none")}>Normal</button>
-              <button className={`px-4 py-1 rounded-full font-semibold ${scenario === "fall" ? "bg-orange-600 text-white" : "bg-gray-100 text-gray-700"}`} onClick={()=>setScenario("fall")}>Market Down 5%</button>
-              <button className={`px-4 py-1 rounded-full font-semibold ${scenario === "vol" ? "bg-purple-600 text-white" : "bg-gray-100 text-gray-700"}`} onClick={()=>setScenario("vol")}>Volatility Spike</button>
-            </div>
-          </div>
-          <div className="grid md:grid-cols-2 gap-8 mt-8">
-            <div>
-              <div className="text-xs text-gray-500 mb-0.5">Before</div>
-              <div className="bg-gray-50 rounded-lg shadow p-5">
-                <div className="flex flex-wrap gap-8 mb-2">
-                  <span className="font-semibold text-gray-700 text-base">VaR 95%: <span className="text-red-600">₹15,450</span></span>
-                  <span className="font-semibold text-base">Sharpe: 0.92</span>
-                  <span className="font-semibold text-base">Beta: 1.08</span>
-                  <span className="font-semibold text-base">Drawdown: -7.3%</span>
-                </div>
-              </div>
-            </div>
-            <div>
-              <div className="text-xs text-gray-500 mb-0.5">After Scenario</div>
-              <div className="bg-gray-50 rounded-lg shadow p-5">
-                <div className="flex flex-wrap gap-8 mb-2">
-                  <span className="font-semibold text-gray-700 text-base">
-                    VaR 95%: <span className="text-red-600">{scenario === "fall" ? "₹21,240" : scenario === "vol" ? "₹19,100" : "₹15,450"}</span>
-                  </span>
-                  <span className="font-semibold text-base">Sharpe: {scenario === "fall" ? "0.71" : scenario === "vol" ? "0.87" : "0.92"}</span>
-                  <span className="font-semibold text-base">Beta: {scenario === "fall" ? "1.22" : scenario === "vol" ? "1.14" : "1.08"}</span>
-                  <span className="font-semibold text-base">Drawdown: {scenario === "fall" ? "-13.9%" : scenario === "vol" ? "-11.2%" : "-7.3%"}</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* GRID: TABLES AND CHARTS */}
-        <div className="grid gap-12 lg:grid-cols-2 mb-10">
-          {/* Position Table */}
-          <div>
-            <div className="bg-white rounded-2xl shadow border p-7 mb-8">
-              <div className="flex items-center mb-4">
-                <BarChart3 className="h-5 w-5 text-blue-400 mr-2" />
-                <h3 className="text-xl font-bold text-gray-900">Positions & Risk Metrics</h3>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="min-w-full text-sm">
-                  <thead className="sticky top-0 bg-white z-10 border-b-2 border-gray-200">
-                    <tr>
-                      <th className="text-left text-xs text-gray-500 font-semibold pb-2">Symbol</th>
-                      <th className="text-right text-xs text-gray-500 font-semibold pb-2">Value</th>
-                      <th className="text-right text-xs text-gray-500 font-semibold pb-2">Weight (%)</th>
-                      <th className="text-right text-xs text-gray-500 font-semibold pb-2">VaR</th>
-                      <th className="text-right text-xs text-gray-500 font-semibold pb-2">Beta</th>
-                      <th className="text-right text-xs text-gray-500 font-semibold pb-2">Sharpe</th>
-                      <th className="text-right text-xs text-gray-500 font-semibold pb-2">Sortino</th>
-                      <th className="text-right text-xs text-gray-500 font-semibold pb-2">Alpha</th>
-                      <th className="text-right text-xs text-gray-500 font-semibold pb-2">Vol</th>
-                      <th className="text-right text-xs text-gray-500 font-semibold pb-2">Risk</th>
-                      <th className="text-center text-xs text-gray-500 font-semibold pb-2">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {positions.map((pos) => (
-                      <tr key={pos.symbol} className="border-b border-gray-100 last:border-0">
-                        <td className="py-3 font-medium text-gray-900">{pos.symbol}
-                          <span className="ml-1 text-xs text-gray-400 font-normal">{pos.name}</span>
-                        </td>
-                        <td className="text-right py-3">₹{pos.value.toLocaleString()}</td>
-                        <td className="text-right py-3">
-                          {editing?.symbol === pos.symbol && editing.field === "weight" ? (
-                            <>
-                              <input
-                                className="w-12 border rounded px-1 text-right"
-                                value={editValue}
-                                onChange={e => setEditValue(e.target.value)}
-                                onBlur={saveEdit}
-                                autoFocus
-                                type="number"
-                                step="0.1"
-                              />
-                              <button className="ml-1 text-xs text-green-700" onClick={saveEdit}>Save</button>
-                            </>
-                          ) : (
-                            <>
-                              {pos.weight}
-                              <button className="ml-2 text-xs text-blue-600 underline" onClick={() => startEdit(pos.symbol, "weight", pos.weight)}>
-                                edit
-                              </button>
-                            </>
-                          )}
-                        </td>
-                        <td className="text-right py-3">₹{pos.var.toLocaleString()}</td>
-                        <td className="text-right py-3">{pos.beta.toFixed(2)}</td>
-                        <td className="text-right py-3">{pos.sharpe.toFixed(2)}</td>
-                        <td className="text-right py-3">{pos.sortino.toFixed(2)}</td>
-                        <td className="text-right py-3">{pos.alpha.toFixed(2)}</td>
-                        <td className="text-right py-3">{pos.vol.toFixed(1)}</td>
-                        <td className={`text-right py-3 font-bold ${getRiskColor(pos.riskScore)}`}>{pos.riskScore}</td>
-                        <td className="text-center py-3">
-                          <button onClick={() => removePosition(pos.symbol)}
-                            className="text-xs text-red-500 hover:underline">Remove</button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-
-          {/* CHART COLUMN: Monte Carlo & Attribution */}
-          <div className="flex flex-col gap-10">
-            {/* Monte Carlo */}
-            <div className="bg-white rounded-2xl shadow border p-7 min-h-[235px] flex flex-col">
-              <div className="flex items-center mb-3">
-                <Zap className="h-5 w-5 text-purple-500 mr-2" />
-                <h4 className="font-semibold text-lg text-gray-900">Monte Carlo Simulation</h4>
-              </div>
-              <div className="flex flex-col items-center flex-1 justify-center mt-2">
-                <div className="flex justify-center items-end h-28 gap-3 w-full mt-4 mb-0">
-                  {sampleMonteCarlo.map(([bucket, val], idx) => (
-                    <div key={bucket} className="flex flex-col items-center">
-                      <div style={{height: `${val/5 + 24}px`}} className="w-9 mb-1 rounded-t bg-purple-400"><span className="block h-full w-full"></span></div>
-                      <span className="text-xs text-gray-500">{bucket}</span>
-                    </div>
-                  ))}
-                </div>
-                <div className="flex items-center w-full justify-between text-xs text-gray-700 mb-2">
-                  <span><b>Tail loss:</b> 4% chance of -10% week</span>
-                  <span><b>5%+ gain:</b> 28% odds</span>
-                </div>
-                <div className="text-xs text-purple-500 text-center w-full">
-                  1000 simulated future states (mock)
-                </div>
-              </div>
-            </div>
-            {/* Risk Breakdown */}
-            <div className="bg-white rounded-2xl shadow border p-7 min-h-[205px] flex flex-col">
-              <div className="flex items-center mb-3">
-                <PieChart className="h-5 w-5 text-blue-500 mr-2" />
-                <h4 className="font-semibold text-lg text-gray-900">Risk Attribution</h4>
-              </div>
-              <div className="w-full overflow-x-auto">
-                <div className="flex items-end gap-7 justify-center min-h-[135px] px-4 py-2" style={{maxWidth:'100%', overflowX:'auto'}}>
-                  {positions.map((pos, idx) => (
-                    <div key={pos.symbol} className="flex flex-col items-center">
-                      <div
-                        className="rounded-t transition-all"
-                        style={{
-                          background: idx % 2 ? "#38bdf8" : "#818cf8",
-                          width: 32,
-                          height: `${Math.min(120, 55 + pos.riskScore/1.1)}px`,
-                          minHeight: 32,
-                          maxHeight: 120,
-                          transition: "height 0.3s"
-                        }}
-                      />
-                      <span className="mt-1 text-xs text-blue-800 font-bold">{pos.symbol}</span>
-                      <span className={`text-xs ${getRiskColor(pos.riskScore)}`}>{pos.riskScore}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-              <div className="w-full text-xs text-center mt-3">
-                <b>{positions.reduce((max, p) => p.riskScore > max.riskScore ? p : max, positions[0]).symbol}</b> is your top risk driver
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* ACTIONABLE SUGGESTIONS */}
-        <div className="bg-gradient-to-r from-green-50 to-blue-50 rounded-2xl shadow border-blue-100 mt-14 mb-7 px-10 py-9 text-gray-900">
-          <div className="flex items-center mb-3">
-            <Shield className="h-5 w-5 text-green-400 mr-2" />
-            <h4 className="font-bold text-xl text-blue-900">Risk Reduction Suggestions</h4>
-          </div>
-          <ul className="list-disc ml-8 space-y-3 text-lg">
-            {suggestions.map((s, i) => (
-              <li key={i} className="flex items-center">
-                <span>{s}</span>
-                <button className="ml-4 px-2.5 py-1.5 text-xs rounded bg-blue-600 text-white hover:bg-blue-700"
-                  onClick={() => alert(`Applied: "${s}"\n(In demo, this would execute hedge/sell/etc.)`)}>
-                  Apply
-                </button>
-              </li>
+                <div style={{ fontSize: 22, fontWeight: 800, color: '#1e293b', transition: 'all 0.5s' }}>{m.val}</div>
+                {education === m.key && (
+                  <div style={{ position: 'absolute', zIndex: 50, top: 'calc(100% + 4px)', left: 0, right: 0, padding: '10px 12px', background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, fontSize: 11, color: '#64748b', lineHeight: 1.5, boxShadow: '0 8px 32px rgba(0,0,0,0.12)' }}>
+                    {metricExplainers[m.key]}
+                  </div>
+                )}
+              </HoverGlowCard>
             ))}
-          </ul>
-          <div className="mt-4 text-xs text-gray-400">AI-powered, tuned for your positions and risk settings.</div>
+          </div>
         </div>
 
-        {/* GAMIFIED STREAK & LEADERBOARD */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 my-10">
-          <div className="bg-white p-7 rounded-2xl shadow border flex items-center gap-5">
-            <UserCheck className="h-10 w-10 text-green-500" />
-            <div>
-              <div className="font-medium text-lg text-gray-900">Streak: <span className="text-green-600 font-bold">{portfolio.streak}</span> days below risk threshold!</div>
-              <div className="text-xs text-gray-500 mt-1">Keep it up and win safer trading badges!</div>
-            </div>
+        {/* ── Scenario Simulator — TiltReveal (NEW effect!) ── */}
+        <HoverGlowCard glowColor="#8b5cf6" style={{ padding: 28, marginBottom: 28 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
+            <Sparkles size={16} color="#8b5cf6" />
+            <TextShimmer baseColor="#1e293b" shimmerColor="#8b5cf6" style={{ fontSize: 16, fontWeight: 700 }}>What-If Scenario Simulator</TextShimmer>
           </div>
-          <div className="bg-white p-7 rounded-2xl shadow border">
-            <div className="font-bold text-lg text-gray-900 mb-2 flex items-center"><Sparkles className="h-5 w-5 text-yellow-500 mr-2" /> Sharpe Leaderboard</div>
-            <ol className="list-decimal ml-6 text-base">{leaderboard.map(({user, sharpe}, i) =>
-              <li key={user} className={user === "You" ? "text-blue-700 font-bold" : ""}>{user} <span className="ml-2 text-xs text-gray-500">Sharpe {sharpe}</span> {user === "You" && " (you)"}</li>)}
-            </ol>
+          <div style={{ display: 'flex', gap: 10, marginBottom: 24, flexWrap: 'wrap' }}>
+            {([
+              { key: 'none' as const, label: '✅ Normal', color: '#3b82f6' },
+              { key: 'fall' as const, label: '📉 Market -5%', color: '#ef4444' },
+              { key: 'vol' as const, label: '🌊 Vol Spike', color: '#8b5cf6' },
+            ]).map(sc => (
+              <button key={sc.key} onClick={() => setScenario(sc.key)} style={{
+                padding: '10px 22px', borderRadius: 12, fontSize: 13, fontWeight: 600, cursor: 'pointer', transition: 'all 0.3s',
+                background: scenario === sc.key ? `${sc.color}12` : '#f8fafc',
+                border: `2px solid ${scenario === sc.key ? sc.color : '#e2e8f0'}`,
+                color: scenario === sc.key ? sc.color : '#64748b',
+                boxShadow: scenario === sc.key ? `0 0 16px ${sc.color}15` : 'none',
+              }}>{sc.label}</button>
+            ))}
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+            {[
+              { title: 'Current State', data: scenarioEffects.none, accent: '#3b82f6' },
+              { title: scenario === 'none' ? 'No Change' : scenario === 'fall' ? 'After -5% Drop' : 'After Vol Spike', data: scenarioEffects[scenario], accent: scenario === 'fall' ? '#ef4444' : scenario === 'vol' ? '#8b5cf6' : '#3b82f6' },
+            ].map((panel, i) => (
+              <TiltReveal key={i} tiltDeg={4}>
+                <div style={{ background: '#f8fafc', border: `1px solid ${panel.accent}20`, borderRadius: 14, padding: 20 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: panel.accent, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 14 }}>{panel.title}</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 20px' }}>
+                    {[
+                      { l: 'VaR 95%', v: `₹${panel.data.var95.toLocaleString()}` },
+                      { l: 'Sharpe', v: panel.data.sharpe.toFixed(2) },
+                      { l: 'Beta', v: panel.data.beta.toFixed(2) },
+                      { l: 'Drawdown', v: `${panel.data.maxDrawdown}%` },
+                    ].map(r => (
+                      <div key={r.l} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: '1px solid #f1f5f9' }}>
+                        <span style={{ fontSize: 12, color: '#94a3b8' }}>{r.l}</span>
+                        <span style={{ fontSize: 13, fontWeight: 700, color: '#1e293b' }}>{r.v}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </TiltReveal>
+            ))}
+          </div>
+        </HoverGlowCard>
+
+        {/* ── Charts Row ───────────────────────────────────── */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24, marginBottom: 28 }}>
+          {/* Monte Carlo — HoverGlowCard */}
+          <HoverGlowCard glowColor="#8b5cf6" style={{ padding: 24 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+              <Zap size={16} color="#8b5cf6" />
+              <span style={{ fontSize: 15, fontWeight: 700, color: '#1e293b' }}>Monte Carlo Simulation</span>
+              <span style={{ marginLeft: 'auto', fontSize: 10, fontWeight: 600, padding: '3px 10px', borderRadius: 20, background: '#f5f3ff', color: '#7c3aed' }}>1000 runs</span>
+            </div>
+            <div style={{ display: 'flex', gap: 6, alignItems: 'flex-end', padding: '8px 0' }}>
+              {monteCarloData.map((d, i) => (
+                <AnimatedBar key={d.bucket} height={(d.count / maxMC) * 110} color={d.color} delay={200 + i * 120} label={d.bucket} value={d.count} />
+              ))}
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 12, fontSize: 11, color: '#94a3b8' }}>
+              <span><strong style={{ color: '#ef4444' }}>4%</strong> chance of -10% week</span>
+              <span><strong style={{ color: '#22c55e' }}>28%</strong> odds of 5%+ gain</span>
+            </div>
+          </HoverGlowCard>
+
+          {/* Drawdown — HoverGlowCard */}
+          <HoverGlowCard glowColor="#ef4444" style={{ padding: 24 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+              <TrendingDown size={16} color="#ef4444" />
+              <span style={{ fontSize: 15, fontWeight: 700, color: '#1e293b' }}>Drawdown Analysis</span>
+              <span style={{ marginLeft: 'auto', fontSize: 10, fontWeight: 600, padding: '3px 10px', borderRadius: 20, background: '#fef2f2', color: '#ef4444' }}>16 weeks</span>
+            </div>
+            <DrawdownChart />
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 10, fontSize: 11, color: '#94a3b8' }}>
+              <span>Max drawdown: <strong style={{ color: '#ef4444' }}>-7.3%</strong></span>
+              <span>Recovery: <strong style={{ color: '#22c55e' }}>~4 weeks</strong></span>
+            </div>
+          </HoverGlowCard>
+        </div>
+
+        {/* ── Position Risk — TiltReveal cards ─────────────── */}
+        <div style={{ marginBottom: 28 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+            <Activity size={16} color="#3b82f6" />
+            <span style={{ fontSize: 16, fontWeight: 700, color: '#1e293b' }}>Position Risk Attribution</span>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: `repeat(${positions.length}, 1fr)`, gap: 16 }}>
+            {positions.map((pos, i) => {
+              const colors = ['#8b5cf6', '#3b82f6', '#f59e0b', '#10b981'];
+              const c = colors[i % colors.length];
+              return (
+                <TiltReveal key={pos.symbol} tiltDeg={5}>
+                  <HoverGlowCard glowColor={c} style={{ padding: 20, textAlign: 'center' }}>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: '#1e293b', marginBottom: 2 }}>{pos.symbol}</div>
+                    <div style={{ fontSize: 10, color: '#94a3b8', marginBottom: 14 }}>{pos.name}</div>
+                    {/* Progress bar */}
+                    <div style={{ width: '100%', height: 6, borderRadius: 3, background: '#f1f5f9', marginBottom: 14, overflow: 'hidden' }}>
+                      <div style={{ width: `${pos.riskScore}%`, height: '100%', borderRadius: 3, background: `linear-gradient(90deg, ${c}, ${c}88)`, boxShadow: `0 0 8px ${c}30`, transition: 'width 1s ease' }} />
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 12px', fontSize: 11 }}>
+                      {[
+                        { l: 'Risk', v: pos.riskScore, color: pos.riskScore > 70 ? '#ef4444' : pos.riskScore > 60 ? '#f59e0b' : '#10b981' },
+                        { l: 'Weight', v: `${pos.weight}%`, color: '#1e293b' },
+                        { l: 'Beta', v: pos.beta.toFixed(2), color: '#1e293b' },
+                        { l: 'VaR', v: `₹${pos.var.toLocaleString()}`, color: '#1e293b' },
+                      ].map(r => (
+                        <div key={r.l} style={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <span style={{ color: '#94a3b8' }}>{r.l}</span>
+                          <span style={{ fontWeight: 700, color: r.color }}>{r.v}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </HoverGlowCard>
+                </TiltReveal>
+              );
+            })}
           </div>
         </div>
+
+        {/* ── AI Suggestions — MovingBorderCard ─────────────── */}
+        <MovingBorderCard borderColor="#10b981" duration={5}>
+          <div style={{ background: 'linear-gradient(135deg, #f0fdf4, #eff6ff)', padding: 28, borderRadius: 15 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
+              <Shield size={18} color="#10b981" />
+              <TextShimmer baseColor="#0f172a" shimmerColor="#10b981" style={{ fontSize: 17, fontWeight: 700 }}>AI Risk Reduction Suggestions</TextShimmer>
+              <span style={{ fontSize: 10, fontWeight: 700, padding: '3px 10px', borderRadius: 20, background: '#dcfce7', color: '#16a34a', marginLeft: 'auto' }}>AI POWERED</span>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {[
+                { text: 'Trim RELIANCE position by 5% to reduce concentration risk.', urgency: 'high' },
+                { text: 'Add NIFTY PUT options for downside protection.', urgency: 'medium' },
+                { text: 'Beta is elevated — consider adding defensive stocks (ITC, HUL).', urgency: 'medium' },
+                { text: 'Sharpe ratio below 1.0 — optimize entry timing using RSI signals.', urgency: 'low' },
+              ].map((tip, i) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '12px 16px', borderRadius: 12, background: '#fff', border: '1px solid #f1f5f9', transition: 'all 0.2s' }}
+                  onMouseEnter={e => { e.currentTarget.style.boxShadow = '0 4px 16px rgba(0,0,0,0.06)'; e.currentTarget.style.transform = 'translateX(4px)'; }}
+                  onMouseLeave={e => { e.currentTarget.style.boxShadow = 'none'; e.currentTarget.style.transform = 'none'; }}>
+                  <PulseBeacon color={tip.urgency === 'high' ? '#ef4444' : tip.urgency === 'medium' ? '#f59e0b' : '#10b981'} size={6} />
+                  <span style={{ fontSize: 13, color: '#334155', flex: 1 }}>{tip.text}</span>
+                  <button style={{ padding: '6px 14px', borderRadius: 8, background: '#eff6ff', border: '1px solid #bfdbfe', color: '#3b82f6', fontSize: 11, fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s', whiteSpace: 'nowrap' }}
+                    onMouseEnter={e => { e.currentTarget.style.background = '#3b82f6'; e.currentTarget.style.color = '#fff'; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = '#eff6ff'; e.currentTarget.style.color = '#3b82f6'; }}
+                    onClick={() => alert(`Applied: "${tip.text}"`)}>Apply</button>
+                </div>
+              ))}
+            </div>
+          </div>
+        </MovingBorderCard>
+
+        {/* ── Streak & Leaderboard ──────────────────────────── */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24, marginTop: 28 }}>
+          <HoverGlowCard glowColor="#10b981" style={{ padding: 24, display: 'flex', alignItems: 'center', gap: 20 }}>
+            <div style={{ width: 56, height: 56, borderRadius: '50%', background: '#dcfce7', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24 }}>🔥</div>
+            <div>
+              <div style={{ fontSize: 15, fontWeight: 700, color: '#1e293b' }}>
+                <AnimatedCounter target={portfolio.streak} style={{ color: '#16a34a', fontSize: 28, fontWeight: 800 }} /> day streak!
+              </div>
+              <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 2 }}>Consecutive days below risk threshold.</div>
+            </div>
+          </HoverGlowCard>
+
+          <HoverGlowCard glowColor="#f59e0b" style={{ padding: 24 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+              <span style={{ fontSize: 18 }}>🏆</span>
+              <span style={{ fontSize: 15, fontWeight: 700, color: '#1e293b' }}>Sharpe Leaderboard</span>
+            </div>
+            {[
+              { user: 'Priya', sharpe: 1.49, rank: 1 }, { user: 'Ajay', sharpe: 1.21, rank: 2 }, { user: 'You', sharpe: 0.92, rank: 3 },
+            ].map(l => (
+              <div key={l.user} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: '1px solid #f1f5f9' }}>
+                <span style={{ fontSize: 13, fontWeight: 800, color: l.rank === 1 ? '#f59e0b' : l.rank === 2 ? '#94a3b8' : '#8b5cf6', width: 22 }}>#{l.rank}</span>
+                <span style={{ fontSize: 13, fontWeight: l.user === 'You' ? 700 : 400, color: l.user === 'You' ? '#6366f1' : '#64748b', flex: 1 }}>{l.user} {l.user === 'You' && '(you)'}</span>
+                <span style={{ fontSize: 13, fontWeight: 700, color: '#1e293b' }}>{l.sharpe.toFixed(2)}</span>
+              </div>
+            ))}
+          </HoverGlowCard>
+        </div>
+
       </div>
     </DashboardLayout>
   );

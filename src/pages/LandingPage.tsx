@@ -1,353 +1,412 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { 
-  ArrowRight, 
-  TrendingUp, 
-  Shield, 
-  Brain, 
-  Users,
-  Star,
-  Play,
-  CheckCircle,
-  Zap,
-  Target,
-  BarChart3
+import {
+  ArrowRight, TrendingUp, Shield, Brain, Star,
+  CheckCircle, Zap, Target, BarChart3, Play
 } from 'lucide-react';
+import {
+  Card3D, SpotlightCard, GridBackground, GradientText, FloatingParticles,
+  Meteors, GlowOrb, AnimatedCounter, Typewriter, MovingBorderCard
+} from '../components/ui/AceternityEffects';
 
 const LandingPage: React.FC = () => {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900">
-      {/* Navigation Header */}
-      <header className="px-6 py-4 bg-black/10 backdrop-blur-sm border-b border-white/10">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <div className="flex items-center space-x-2">
-            <div className="w-10 h-10 bg-gradient-to-br from-blue-400 to-blue-600 rounded-lg flex items-center justify-center">
-              <TrendingUp className="h-6 w-6 text-white" />
-            </div>
-            <span className="text-2xl font-bold bg-gradient-to-r from-blue-400 to-blue-600 bg-clip-text text-transparent">
-              AlgoForge
-            </span>
-          </div>
-          
-          <nav className="hidden md:flex items-center space-x-8">
-            <a href="#features" className="text-gray-300 hover:text-white transition-colors">Features</a>
-            <a href="#pricing" className="text-gray-300 hover:text-white transition-colors">Pricing</a>
-            <a href="#learning" className="text-gray-300 hover:text-white transition-colors">Learn</a>
-            <a href="#community" className="text-gray-300 hover:text-white transition-colors">Community</a>
-          </nav>
+    <div style={{ background: '#030712', minHeight: '100vh', color: '#e2e8f0', fontFamily: "'Inter', sans-serif", overflow: 'hidden' }}>
 
-          <div className="flex items-center space-x-4">
-            <Link 
-              to="/login" 
-              className="text-gray-300 hover:text-white transition-colors"
-            >
-              Login
-            </Link>
-            <Link 
-              to="/register" 
-              className="bg-gradient-to-r from-blue-500 to-blue-600 text-white px-6 py-2 rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all duration-200 transform hover:scale-105"
-            >
-              Sign Up
-            </Link>
+      {/* ── Navbar ──────────────────────────────── */}
+      <header style={{
+        position: 'sticky', top: 0, zIndex: 100,
+        background: 'rgba(3,7,18,0.7)', backdropFilter: 'blur(20px) saturate(180%)',
+        borderBottom: '1px solid rgba(255,255,255,0.05)',
+        padding: '0 40px', height: 64, display: 'flex', alignItems: 'center', justifyContent: 'space-between'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{
+            width: 36, height: 36, borderRadius: 9,
+            background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            boxShadow: '0 0 20px rgba(59,130,246,0.3)'
+          }}>
+            <TrendingUp size={18} color="#fff" />
           </div>
+          <span style={{ fontSize: 20, fontWeight: 800, letterSpacing: -0.5, color: '#fff' }}>AlgoForge</span>
+        </div>
+
+        <nav style={{ display: 'flex', alignItems: 'center', gap: 32 }}>
+          {['Features', 'Pricing', 'Learn', 'Community'].map(t => (
+            <a key={t} href={`#${t.toLowerCase()}`} style={{
+              fontSize: 14, fontWeight: 500, color: '#64748b', textDecoration: 'none', transition: 'color .2s'
+            }} onMouseEnter={e => (e.currentTarget.style.color = '#fff')} onMouseLeave={e => (e.currentTarget.style.color = '#64748b')}>
+              {t}
+            </a>
+          ))}
+        </nav>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+          <Link to="/login" style={{ fontSize: 14, fontWeight: 500, color: '#94a3b8', textDecoration: 'none' }}>Login</Link>
+          <Link to="/register" style={{
+            fontSize: 14, fontWeight: 600, color: '#fff', textDecoration: 'none',
+            background: 'linear-gradient(135deg, #3b82f6, #6366f1)', padding: '8px 20px',
+            borderRadius: 8, boxShadow: '0 0 20px rgba(99,102,241,0.4), 0 4px 12px rgba(59,130,246,0.3)',
+            transition: 'all .2s'
+          }}>Get Started</Link>
         </div>
       </header>
 
-      {/* Hero Section */}
-      <section className="px-6 py-20 text-center">
-        <div className="max-w-4xl mx-auto">
-          <div className="mb-8 animate-fade-in-up">
-            <h1 className="text-5xl md:text-6xl font-bold text-white mb-6 leading-tight">
-              Democratizing 
-              <span className="bg-gradient-to-r from-blue-400 to-purple-600 bg-clip-text text-transparent">
-                {' '}Algorithmic Trading{' '}
-              </span>
-              for Everyone
-            </h1>
-            <p className="text-xl text-gray-300 mb-8 max-w-3xl mx-auto">
-              Build, backtest, and deploy trading strategies without coding. Learn while earning credits 
-              and join thousands of traders transforming their approach to the Indian stock market.
-            </p>
+      {/* ── Hero ────────────────────────────────── */}
+      <section style={{ padding: '120px 40px 80px', textAlign: 'center', position: 'relative' }}>
+        <GridBackground color="rgba(99,102,241,0.04)" />
+        <FloatingParticles count={40} color="rgba(99,102,241,0.4)" />
+        <Meteors count={8} />
+        <GlowOrb color="rgba(59,130,246,0.12)" size={600} top="-200px" left="20%" />
+        <GlowOrb color="rgba(139,92,246,0.1)" size={500} top="-100px" right="15%" blur={100} />
+        <GlowOrb color="rgba(236,72,153,0.06)" size={400} top="200px" left="50%" />
+
+        <div style={{ position: 'relative', zIndex: 1, maxWidth: 900, margin: '0 auto' }}>
+          {/* Pill badge */}
+          <div className="animate-in" style={{
+            display: 'inline-flex', alignItems: 'center', gap: 8,
+            background: 'linear-gradient(135deg, rgba(59,130,246,0.1), rgba(139,92,246,0.1))',
+            border: '1px solid rgba(99,102,241,0.2)', borderRadius: 24,
+            padding: '6px 18px', marginBottom: 32, fontSize: 13, fontWeight: 500, color: '#818cf8'
+          }}>
+            <Zap size={13} /> Built for Indian Markets · NSE / BSE
           </div>
 
-          <div className="flex flex-col sm:flex-row items-center justify-center space-y-4 sm:space-y-0 sm:space-x-6 mb-12">
-            <Link 
-              to="/register" 
-              className="bg-gradient-to-r from-blue-500 to-blue-600 text-white px-8 py-4 rounded-xl hover:from-blue-600 hover:to-blue-700 transition-all duration-200 transform hover:scale-105 flex items-center space-x-2 font-semibold"
-            >
-              <span>Start Free Trial</span>
-              <ArrowRight className="h-5 w-5" />
-            </Link>
-            <button className="border border-white/30 text-white px-8 py-4 rounded-xl hover:bg-white/10 transition-all duration-200 flex items-center space-x-2">
-              <Play className="h-5 w-5" />
-              <span>Watch Demo</span>
-            </button>
-          </div>
+          <h1 className="animate-in delay-1" style={{
+            fontSize: 64, fontWeight: 800, lineHeight: 1.05, letterSpacing: -2, marginBottom: 10, color: '#fff'
+          }}>
+            Build & Backtest
+          </h1>
+          <h1 className="animate-in delay-2" style={{
+            fontSize: 64, fontWeight: 800, lineHeight: 1.05, letterSpacing: -2, marginBottom: 10
+          }}>
+            <GradientText from="#60a5fa" via="#a78bfa" to="#f472b6">
+              <Typewriter words={['Trading Strategies', 'Algo Systems', 'Options Plays', 'Market Signals']} />
+            </GradientText>
+          </h1>
+          <h1 className="animate-in delay-3" style={{
+            fontSize: 64, fontWeight: 800, lineHeight: 1.05, letterSpacing: -2, marginBottom: 32, color: '#fff'
+          }}>
+            Without Code
+          </h1>
 
-          <p className="text-sm text-gray-400">
-            No credit card required • Free forever plan available
+          <p className="animate-in delay-4" style={{ fontSize: 18, color: '#94a3b8', lineHeight: 1.65, maxWidth: 580, margin: '0 auto 40px' }}>
+            Test strategies on real Nifty 50 data. Get Sharpe ratios, equity curves, and trade logs — all for free.
           </p>
-        </div>
-      </section>
 
-      {/* Value Proposition Cards */}
-      <section className="px-6 py-16">
-        <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-          <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-2xl p-6 hover:bg-white/15 transition-all duration-300 transform hover:scale-105">
-            <div className="w-12 h-12 bg-gradient-to-br from-blue-400 to-blue-600 rounded-xl flex items-center justify-center mb-4">
-              <Zap className="h-6 w-6 text-white" />
-            </div>
-            <h3 className="text-xl font-semibold text-white mb-2">No-Code Strategy Builder</h3>
-            <p className="text-gray-300">
-              Visual drag-and-drop interface to build complex trading strategies without writing a single line of code.
-            </p>
-          </div>
-
-          <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-2xl p-6 hover:bg-white/15 transition-all duration-300 transform hover:scale-105">
-            <div className="w-12 h-12 bg-gradient-to-br from-green-400 to-green-600 rounded-xl flex items-center justify-center mb-4">
-              <Brain className="h-6 w-6 text-white" />
-            </div>
-            <h3 className="text-xl font-semibold text-white mb-2">AI Trading Assistant</h3>
-            <p className="text-gray-300">
-              Get personalized trading insights and strategy recommendations from our advanced AI copilot.
-            </p>
-          </div>
-
-          <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-2xl p-6 hover:bg-white/15 transition-all duration-300 transform hover:scale-105">
-            <div className="w-12 h-12 bg-gradient-to-br from-purple-400 to-purple-600 rounded-xl flex items-center justify-center mb-4">
-              <Shield className="h-6 w-6 text-white" />
-            </div>
-            <h3 className="text-xl font-semibold text-white mb-2">Risk-Free Paper Trading</h3>
-            <p className="text-gray-300">
-              Test your strategies with virtual money before risking real capital. Perfect for learning and validation.
-            </p>
-          </div>
-
-          <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-2xl p-6 hover:bg-white/15 transition-all duration-300 transform hover:scale-105">
-            <div className="w-12 h-12 bg-gradient-to-br from-orange-400 to-orange-600 rounded-xl flex items-center justify-center mb-4">
-              <Target className="h-6 w-6 text-white" />
-            </div>
-            <h3 className="text-xl font-semibold text-white mb-2">Earn Credits Learning</h3>
-            <p className="text-gray-300">
-              Gamified learning platform where you earn credits for completing courses and quizzes to unlock premium features.
-            </p>
+          <div className="animate-in delay-5" style={{ display: 'flex', justifyContent: 'center', gap: 16 }}>
+            <Link to="/register" style={{
+              display: 'inline-flex', alignItems: 'center', gap: 8,
+              background: 'linear-gradient(135deg, #3b82f6, #6366f1)', color: '#fff',
+              padding: '14px 36px', borderRadius: 12, fontSize: 15, fontWeight: 600,
+              textDecoration: 'none',
+              boxShadow: '0 0 30px rgba(99,102,241,0.4), 0 8px 20px rgba(59,130,246,0.3)',
+              transition: 'all .25s'
+            }}
+              onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px) scale(1.02)'; e.currentTarget.style.boxShadow = '0 0 50px rgba(99,102,241,0.5), 0 12px 30px rgba(59,130,246,0.4)'; }}
+              onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = '0 0 30px rgba(99,102,241,0.4), 0 8px 20px rgba(59,130,246,0.3)'; }}
+            >
+              Start Free <ArrowRight size={16} />
+            </Link>
+            <Link to="/login" style={{
+              display: 'inline-flex', alignItems: 'center', gap: 8,
+              background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)',
+              color: '#e2e8f0', padding: '14px 36px', borderRadius: 12, fontSize: 15, fontWeight: 500,
+              textDecoration: 'none', transition: 'all .2s', backdropFilter: 'blur(8px)'
+            }}
+              onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.08)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.2)'; }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)'; }}
+            >
+              <Play size={15} /> Watch Demo
+            </Link>
           </div>
         </div>
       </section>
 
-      {/* Feature Preview */}
-      <section className="px-6 py-20 bg-black/20">
-        <div className="max-w-5xl mx-auto text-center">
-          <h2 className="text-4xl font-bold text-white mb-8">
-            See AlgoForge in Action
+      {/* ── Dashboard Preview (3D) ──────────────── */}
+      <section className="animate-in delay-6" style={{ padding: '0 40px 100px', maxWidth: 1100, margin: '0 auto', position: 'relative', zIndex: 1 }}>
+        <Card3D intensity={8} style={{
+          background: 'linear-gradient(145deg, rgba(255,255,255,0.04), rgba(255,255,255,0.01))',
+          border: '1px solid rgba(255,255,255,0.08)', borderRadius: 20,
+          padding: 4, boxShadow: '0 20px 80px rgba(0,0,0,0.5), 0 0 60px rgba(99,102,241,0.1)'
+        }}>
+          <div style={{
+            background: 'linear-gradient(135deg, #0f172a, #1e293b)', borderRadius: 16,
+            height: 380, display: 'flex', padding: 24, gap: 16, overflow: 'hidden'
+          }}>
+            {/* sidebar mock */}
+            <div style={{ width: 160, background: '#080f1e', borderRadius: 12, padding: 16 }}>
+              {[1, 2, 3, 4, 5].map(i => (
+                <div key={i} style={{
+                  height: 8, borderRadius: 4, marginBottom: 10,
+                  background: i === 1 ? 'linear-gradient(90deg, #3b82f6, #8b5cf6)' : 'rgba(255,255,255,0.05)',
+                  width: `${50 + i * 8}%`, transition: 'all 0.3s',
+                  boxShadow: i === 1 ? '0 0 12px rgba(59,130,246,0.3)' : 'none'
+                }} />
+              ))}
+            </div>
+            {/* main area */}
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div style={{ display: 'flex', gap: 10 }}>
+                {[
+                  { c: '#3b82f6', v: '₹82,249', l: 'SENSEX' },
+                  { c: '#059669', v: '₹25,497', l: 'NIFTY' },
+                  { c: '#f59e0b', v: '+2.4%', l: 'Returns' },
+                  { c: '#8b5cf6', v: '1.8', l: 'Sharpe' },
+                ].map((d, i) => (
+                  <div key={i} style={{
+                    flex: 1, padding: '12px 14px', borderRadius: 10,
+                    background: `linear-gradient(135deg, ${d.c}15, ${d.c}05)`,
+                    border: `1px solid ${d.c}25`,
+                    boxShadow: `inset 0 1px 0 ${d.c}15`
+                  }}>
+                    <div style={{ fontSize: 10, color: '#64748b', marginBottom: 2 }}>{d.l}</div>
+                    <div style={{ fontSize: 15, fontWeight: 700, color: '#fff' }}>{d.v}</div>
+                  </div>
+                ))}
+              </div>
+              <div style={{
+                flex: 1, background: 'rgba(255,255,255,0.015)', border: '1px solid rgba(255,255,255,0.05)',
+                borderRadius: 12, padding: 16, display: 'flex', alignItems: 'flex-end'
+              }}>
+                <svg viewBox="0 0 500 120" style={{ width: '100%', height: '100%' }}>
+                  <defs>
+                    <linearGradient id="lg" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#6366f1" stopOpacity="0.25" />
+                      <stop offset="100%" stopColor="#6366f1" stopOpacity="0" />
+                    </linearGradient>
+                  </defs>
+                  <polygon points="0,100 20,95 50,88 80,90 120,70 160,72 200,55 240,60 280,40 320,45 360,25 400,30 440,15 480,20 500,10 500,120 0,120"
+                    fill="url(#lg)" />
+                  <polyline points="0,100 20,95 50,88 80,90 120,70 160,72 200,55 240,60 280,40 320,45 360,25 400,30 440,15 480,20 500,10"
+                    fill="none" stroke="#6366f1" strokeWidth="2" style={{ filter: 'drop-shadow(0 0 6px rgba(99,102,241,0.5))' }} />
+                </svg>
+              </div>
+            </div>
+          </div>
+        </Card3D>
+      </section>
+
+      {/* ── Features (3D Spotlight Cards) ──────── */}
+      <section id="features" style={{ padding: '80px 40px', maxWidth: 1100, margin: '0 auto', position: 'relative' }}>
+        <GlowOrb color="rgba(59,130,246,0.06)" size={500} top="0" left="-10%" animate />
+
+        <div style={{ textAlign: 'center', marginBottom: 56, position: 'relative', zIndex: 1 }}>
+          <h2 style={{ fontSize: 40, fontWeight: 800, color: '#fff', marginBottom: 12, letterSpacing: -1 }}>
+            Everything You Need to <GradientText>Trade Smarter</GradientText>
           </h2>
-          <div className="relative bg-gradient-to-br from-gray-800 to-gray-900 rounded-2xl p-8 border border-white/10">
-            <div className="aspect-video bg-gradient-to-br from-blue-900/50 to-purple-900/50 rounded-xl flex items-center justify-center border border-white/10">
-              <div className="text-center">
-                <div className="w-20 h-20 bg-white/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Play className="h-10 w-10 text-white" />
-                </div>
-                <h3 className="text-2xl font-semibold text-white mb-2">Interactive Demo</h3>
-                <p className="text-gray-300">2-minute walkthrough of the platform</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Social Proof */}
-      <section className="px-6 py-16">
-        <div className="max-w-6xl mx-auto">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-16">
-            <div className="text-center">
-              <div className="text-4xl font-bold text-white mb-2">10,000+</div>
-              <div className="text-gray-300">Active Traders</div>
-            </div>
-            <div className="text-center">
-              <div className="text-4xl font-bold text-white mb-2">₹50Cr+</div>
-              <div className="text-gray-300">Total Volume Traded</div>
-            </div>
-            <div className="text-center">
-              <div className="text-4xl font-bold text-white mb-2">95%</div>
-              <div className="text-gray-300">User Success Rate</div>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-6">
-              <div className="flex items-center mb-4">
-                <div className="w-10 h-10 bg-gradient-to-br from-blue-400 to-blue-600 rounded-full flex items-center justify-center mr-3">
-                  <span className="text-sm font-bold text-white">RK</span>
-                </div>
-                <div>
-                  <div className="font-semibold text-white">Rajesh Kumar</div>
-                  <div className="text-sm text-gray-300">Professional Trader</div>
-                </div>
-              </div>
-              <div className="flex mb-3">
-                {[...Array(5)].map((_, i) => (
-                  <Star key={i} className="h-4 w-4 text-yellow-400 fill-current" />
-                ))}
-              </div>
-              <p className="text-gray-300 text-sm">
-                "AlgoForge transformed my trading approach. The AI assistant is incredibly helpful, 
-                and I've improved my returns by 40% since starting."
-              </p>
-            </div>
-
-            <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-6">
-              <div className="flex items-center mb-4">
-                <div className="w-10 h-10 bg-gradient-to-br from-green-400 to-green-600 rounded-full flex items-center justify-center mr-3">
-                  <span className="text-sm font-bold text-white">PS</span>
-                </div>
-                <div>
-                  <div className="font-semibold text-white">Priya Sharma</div>
-                  <div className="text-sm text-gray-300">Options Specialist</div>
-                </div>
-              </div>
-              <div className="flex mb-3">
-                {[...Array(5)].map((_, i) => (
-                  <Star key={i} className="h-4 w-4 text-yellow-400 fill-current" />
-                ))}
-              </div>
-              <p className="text-gray-300 text-sm">
-                "The options analytics tools are phenomenal. I can analyze Greeks, run scenarios, 
-                and manage risk better than ever before."
-              </p>
-            </div>
-
-            <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-6">
-              <div className="flex items-center mb-4">
-                <div className="w-10 h-10 bg-gradient-to-br from-purple-400 to-purple-600 rounded-full flex items-center justify-center mr-3">
-                  <span className="text-sm font-bold text-white">AM</span>
-                </div>
-                <div>
-                  <div className="font-semibold text-white">Arjun Mehta</div>
-                  <div className="text-sm text-gray-300">Algo Trading Enthusiast</div>
-                </div>
-              </div>
-              <div className="flex mb-3">
-                {[...Array(5)].map((_, i) => (
-                  <Star key={i} className="h-4 w-4 text-yellow-400 fill-current" />
-                ))}
-              </div>
-              <p className="text-gray-300 text-sm">
-                "Started as a complete beginner. The learning platform is amazing, 
-                and now I'm running profitable strategies with confidence."
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Trust Indicators */}
-      <section className="px-6 py-16 bg-black/20">
-        <div className="max-w-4xl mx-auto">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-center">
-            <div className="flex flex-col items-center">
-              <div className="w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center mb-4">
-                <CheckCircle className="h-8 w-8 text-green-400" />
-              </div>
-              <h3 className="text-lg font-semibold text-white mb-2">SEBI Compliant</h3>
-              <p className="text-gray-300 text-sm">
-                Fully compliant with Indian market regulations and SEBI guidelines for algorithmic trading.
-              </p>
-            </div>
-
-            <div className="flex flex-col items-center">
-              <div className="w-16 h-16 bg-blue-500/20 rounded-full flex items-center justify-center mb-4">
-                <Shield className="h-8 w-8 text-blue-400" />
-              </div>
-              <h3 className="text-lg font-semibold text-white mb-2">Bank-Grade Security</h3>
-              <p className="text-gray-300 text-sm">
-                Enterprise-level security with encrypted data transmission and secure API integrations.
-              </p>
-            </div>
-
-            <div className="flex flex-col items-center">
-              <div className="w-16 h-16 bg-purple-500/20 rounded-full flex items-center justify-center mb-4">
-                <BarChart3 className="h-8 w-8 text-purple-400" />
-              </div>
-              <h3 className="text-lg font-semibold text-white mb-2">99.9% Uptime</h3>
-              <p className="text-gray-300 text-sm">
-                Reliable platform with high availability and real-time market data connectivity.
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Call to Action */}
-      <section className="px-6 py-20">
-        <div className="max-w-4xl mx-auto text-center">
-          <h2 className="text-4xl font-bold text-white mb-6">
-            Ready to Transform Your Trading?
-          </h2>
-          <p className="text-xl text-gray-300 mb-8">
-            Join thousands of traders who are already using AlgoForge to build better strategies.
+          <p style={{ fontSize: 16, color: '#64748b', maxWidth: 520, margin: '0 auto' }}>
+            From strategy building to backtesting to live market data — all in one platform.
           </p>
-          <div className="flex flex-col sm:flex-row items-center justify-center space-y-4 sm:space-y-0 sm:space-x-6">
-            <Link 
-              to="/register" 
-              className="bg-gradient-to-r from-blue-500 to-blue-600 text-white px-8 py-4 rounded-xl hover:from-blue-600 hover:to-blue-700 transition-all duration-200 transform hover:scale-105 flex items-center space-x-2 font-semibold"
-            >
-              <span>Start Free Trial</span>
-              <ArrowRight className="h-5 w-5" />
-            </Link>
-            <Link 
-              to="/login" 
-              className="border border-white/30 text-white px-8 py-4 rounded-xl hover:bg-white/10 transition-all duration-200"
-            >
-              Already have an account? Sign In
-            </Link>
-          </div>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, position: 'relative', zIndex: 1 }}>
+          {[
+            { icon: Zap, title: 'Strategy Builder', desc: 'Build entry/exit rules with dropdowns. RSI, SMA, EMA, MACD — no code needed.', color: '#3b82f6' },
+            { icon: BarChart3, title: 'Backtesting Lab', desc: 'Test on real Nifty 50 history. See equity curves, Sharpe, drawdown, trade logs.', color: '#059669' },
+            { icon: TrendingUp, title: 'Live Market Data', desc: '50 NSE stocks updated every 30s. Indices, breadth, top movers — all live.', color: '#f59e0b' },
+            { icon: Target, title: 'Options Chain', desc: 'Real NIFTY & BANKNIFTY options data with OI, IV, volume, and ATM strike.', color: '#8b5cf6' },
+            { icon: Shield, title: 'Risk Management', desc: 'Position sizing, stop-loss, take-profit controls built into every strategy.', color: '#ef4444' },
+            { icon: Brain, title: 'Smart Analytics', desc: 'Sharpe, Sortino, Calmar ratios. Profit factor, win rate, max drawdown.', color: '#06b6d4' },
+          ].map((f, i) => {
+            const Icon = f.icon;
+            return (
+              <SpotlightCard key={i} color={f.color + '20'} style={{ padding: 28 }}>
+                <div style={{
+                  width: 48, height: 48, borderRadius: 12,
+                  background: `linear-gradient(135deg, ${f.color}20, ${f.color}08)`,
+                  border: `1px solid ${f.color}30`,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16,
+                  boxShadow: `0 0 20px ${f.color}15`
+                }}>
+                  <Icon size={22} color={f.color} />
+                </div>
+                <h3 style={{ fontSize: 17, fontWeight: 700, color: '#fff', marginBottom: 8 }}>{f.title}</h3>
+                <p style={{ fontSize: 14, color: '#94a3b8', lineHeight: 1.55 }}>{f.desc}</p>
+              </SpotlightCard>
+            );
+          })}
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="px-6 py-12 border-t border-white/10">
-        <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-4 gap-8">
-          <div>
-            <div className="flex items-center space-x-2 mb-4">
-              <div className="w-8 h-8 bg-gradient-to-br from-blue-400 to-blue-600 rounded-lg flex items-center justify-center">
-                <TrendingUp className="h-4 w-4 text-white" />
-              </div>
-              <span className="text-xl font-bold text-white">AlgoForge</span>
+      {/* ── Stats (Animated Counters) ──────────── */}
+      <section style={{
+        padding: '72px 40px', maxWidth: 900, margin: '0 auto', position: 'relative', zIndex: 1,
+        display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 24, textAlign: 'center'
+      }}>
+        {[
+          { n: 50, s: '+', l: 'NSE Stocks' },
+          { n: 4, s: '', l: 'Built-in Strategies' },
+          { n: 10, s: '+', l: 'Risk Metrics' },
+          { n: 0, s: '', l: 'Forever Free', prefix: '₹' },
+        ].map(s => (
+          <div key={s.l} style={{ position: 'relative' }}>
+            <div style={{ fontSize: 42, fontWeight: 800, color: '#fff', letterSpacing: -1, marginBottom: 4 }}>
+              <AnimatedCounter target={s.n} prefix={s.prefix || ''} suffix={s.s} />
             </div>
-            <p className="text-gray-400 text-sm">
-              Democratizing algorithmic trading for everyone in the Indian market.
+            <div style={{ fontSize: 14, color: '#475569' }}>{s.l}</div>
+          </div>
+        ))}
+      </section>
+
+      {/* ── Testimonials (3D Cards) ──────────── */}
+      <section style={{ padding: '80px 40px', maxWidth: 1100, margin: '0 auto', position: 'relative' }}>
+        <GlowOrb color="rgba(139,92,246,0.06)" size={400} bottom="0" right="10%" animate />
+
+        <h2 style={{ fontSize: 36, fontWeight: 800, color: '#fff', textAlign: 'center', marginBottom: 48, letterSpacing: -0.5, position: 'relative', zIndex: 1 }}>
+          Trusted by <GradientText from="#059669" via="#3b82f6" to="#8b5cf6">Indian Traders</GradientText>
+        </h2>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, position: 'relative', zIndex: 1 }}>
+          {[
+            { name: 'Rajesh Kumar', role: 'Professional Trader', quote: 'AlgoForge backtesting is incredibly fast. I tested 3 strategies in 10 minutes with real NIFTY data.', color: '#3b82f6' },
+            { name: 'Priya Sharma', role: 'Options Specialist', quote: 'The options chain viewer with real NSE data is exactly what I needed. No more scraping manually.', color: '#059669' },
+            { name: 'Arjun Mehta', role: 'Algo Enthusiast', quote: 'Started as a beginner. The no-code strategy builder made it easy to test my first MA crossover.', color: '#8b5cf6' },
+          ].map((t, i) => (
+            <Card3D key={i} intensity={10} style={{ padding: 28 }}>
+              <div style={{ display: 'flex', gap: 4, marginBottom: 16 }}>
+                {[1, 2, 3, 4, 5].map(s => <Star key={s} size={14} color="#fbbf24" fill="#fbbf24" />)}
+              </div>
+              <p style={{ fontSize: 14, color: '#cbd5e1', lineHeight: 1.65, marginBottom: 24, fontStyle: 'italic' }}>
+                "{t.quote}"
+              </p>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{
+                  width: 38, height: 38, borderRadius: '50%',
+                  background: `linear-gradient(135deg, ${t.color}, ${t.color}88)`,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  color: '#fff', fontSize: 13, fontWeight: 700,
+                  boxShadow: `0 0 15px ${t.color}40`
+                }}>
+                  {t.name.split(' ').map(n => n[0]).join('')}
+                </div>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: '#fff' }}>{t.name}</div>
+                  <div style={{ fontSize: 12, color: '#64748b' }}>{t.role}</div>
+                </div>
+              </div>
+            </Card3D>
+          ))}
+        </div>
+      </section>
+
+      {/* ── Trust ──────────────────────────────── */}
+      <section style={{
+        padding: '64px 40px', maxWidth: 900, margin: '0 auto', position: 'relative', zIndex: 1,
+        display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 24, textAlign: 'center'
+      }}>
+        {[
+          { icon: CheckCircle, title: 'SEBI Compliant', desc: 'Follows Indian market regulations', color: '#059669' },
+          { icon: Shield, title: 'Secure Platform', desc: 'Data encrypted & private', color: '#3b82f6' },
+          { icon: BarChart3, title: 'Real Market Data', desc: 'Yahoo Finance + NSE APIs', color: '#8b5cf6' },
+        ].map((b, i) => {
+          const Icon = b.icon;
+          return (
+            <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+              <div style={{
+                width: 56, height: 56, borderRadius: '50%',
+                background: `linear-gradient(135deg, ${b.color}15, ${b.color}08)`,
+                border: `1px solid ${b.color}25`,
+                display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 14,
+                boxShadow: `0 0 20px ${b.color}15`
+              }}>
+                <Icon size={22} color={b.color} />
+              </div>
+              <div style={{ fontSize: 15, fontWeight: 700, color: '#fff', marginBottom: 4 }}>{b.title}</div>
+              <div style={{ fontSize: 13, color: '#64748b' }}>{b.desc}</div>
+            </div>
+          );
+        })}
+      </section>
+
+      {/* ── CTA (Moving Border) ──────────────── */}
+      <section style={{ padding: '80px 40px', position: 'relative' }}>
+        <GridBackground color="rgba(99,102,241,0.03)" fade />
+        <div style={{ maxWidth: 700, margin: '0 auto', position: 'relative', zIndex: 1 }}>
+          <MovingBorderCard borderColor="#6366f1" duration={3}>
+            <div style={{ padding: '56px 48px', textAlign: 'center', position: 'relative' }}>
+              <GlowOrb color="rgba(99,102,241,0.08)" size={200} top="-60px" right="-60px" animate={false} />
+              <h2 style={{ fontSize: 36, fontWeight: 800, color: '#fff', marginBottom: 12, letterSpacing: -0.5, position: 'relative', zIndex: 1 }}>
+                Start Trading <GradientText>Smarter</GradientText> Today
+              </h2>
+              <p style={{ fontSize: 16, color: '#94a3b8', marginBottom: 32, position: 'relative', zIndex: 1 }}>
+                Join thousands of Indian traders who test before they trade.
+              </p>
+              <div style={{ display: 'flex', justifyContent: 'center', gap: 14, position: 'relative', zIndex: 1 }}>
+                <Link to="/register" style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 8,
+                  background: 'linear-gradient(135deg, #3b82f6, #6366f1)', color: '#fff',
+                  padding: '14px 32px', borderRadius: 12, fontSize: 15, fontWeight: 600,
+                  textDecoration: 'none',
+                  boxShadow: '0 0 30px rgba(99,102,241,0.5), 0 8px 20px rgba(59,130,246,0.3)'
+                }}>
+                  Create Free Account <ArrowRight size={16} />
+                </Link>
+                <Link to="/login" style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 8,
+                  background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
+                  color: '#e2e8f0', padding: '14px 32px', borderRadius: 12, fontSize: 15, fontWeight: 500,
+                  textDecoration: 'none'
+                }}>
+                  Sign In
+                </Link>
+              </div>
+            </div>
+          </MovingBorderCard>
+        </div>
+      </section>
+
+      {/* ── Footer ─────────────────────────────── */}
+      <footer style={{
+        borderTop: '1px solid rgba(255,255,255,0.05)', padding: '48px 40px 32px',
+        maxWidth: 1100, margin: '0 auto'
+      }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr', gap: 40, marginBottom: 40 }}>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+              <div style={{
+                width: 28, height: 28, borderRadius: 6,
+                background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center'
+              }}>
+                <TrendingUp size={14} color="#fff" />
+              </div>
+              <span style={{ fontSize: 16, fontWeight: 700, color: '#fff' }}>AlgoForge</span>
+            </div>
+            <p style={{ fontSize: 13, color: '#475569', lineHeight: 1.6, maxWidth: 260 }}>
+              Algorithmic trading platform for Indian markets. Build, test, and analyze strategies.
             </p>
           </div>
-
-          <div>
-            <h4 className="font-semibold text-white mb-4">Learn</h4>
-            <ul className="space-y-2 text-sm">
-              <li><a href="#" className="text-gray-400 hover:text-white transition-colors">Trading Courses</a></li>
-              <li><a href="#" className="text-gray-400 hover:text-white transition-colors">Tutorials</a></li>
-              <li><a href="#" className="text-gray-400 hover:text-white transition-colors">Community</a></li>
-              <li><a href="#" className="text-gray-400 hover:text-white transition-colors">Blog</a></li>
-            </ul>
-          </div>
-
-          <div>
-            <h4 className="font-semibold text-white mb-4">Support</h4>
-            <ul className="space-y-2 text-sm">
-              <li><a href="#" className="text-gray-400 hover:text-white transition-colors">Help Center</a></li>
-              <li><a href="#" className="text-gray-400 hover:text-white transition-colors">Contact Us</a></li>
-              <li><a href="#" className="text-gray-400 hover:text-white transition-colors">API Docs</a></li>
-              <li><a href="#" className="text-gray-400 hover:text-white transition-colors">Status</a></li>
-            </ul>
-          </div>
+          {[
+            { title: 'Platform', links: ['Strategy Builder', 'Backtesting', 'Live Market', 'Options Chain'] },
+            { title: 'Learn', links: ['Trading Basics', 'Strategy Guide', 'Risk Mgmt', 'Blog'] },
+            { title: 'Support', links: ['Help Center', 'Contact', 'API Docs', 'Status'] },
+          ].map(col => (
+            <div key={col.title}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: '#94a3b8', marginBottom: 14, textTransform: 'uppercase', letterSpacing: 0.8 }}>
+                {col.title}
+              </div>
+              {col.links.map(l => (
+                <a key={l} href="#" style={{
+                  display: 'block', fontSize: 13, color: '#475569', textDecoration: 'none',
+                  marginBottom: 8, transition: 'color .15s'
+                }} onMouseEnter={e => (e.currentTarget.style.color = '#e2e8f0')} onMouseLeave={e => (e.currentTarget.style.color = '#475569')}>
+                  {l}
+                </a>
+              ))}
+            </div>
+          ))}
         </div>
-
-        <div className="max-w-6xl mx-auto mt-8 pt-8 border-t border-white/10 flex flex-col md:flex-row justify-between items-center">
-          <p className="text-gray-400 text-sm">
-            © 2025 AlgoForge. All rights reserved.
-          </p>
-          <div className="flex space-x-6 mt-4 md:mt-0">
-            <a href="#" className="text-gray-400 hover:text-white transition-colors text-sm">Privacy Policy</a>
-            <a href="#" className="text-gray-400 hover:text-white transition-colors text-sm">Terms of Service</a>
-            <a href="#" className="text-gray-400 hover:text-white transition-colors text-sm">Cookie Policy</a>
+        <div style={{
+          borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: 24,
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center'
+        }}>
+          <span style={{ fontSize: 12, color: '#334155' }}>© 2025 AlgoForge. All rights reserved.</span>
+          <div style={{ display: 'flex', gap: 20 }}>
+            {['Privacy', 'Terms', 'Cookies'].map(l => (
+              <a key={l} href="#" style={{ fontSize: 12, color: '#334155', textDecoration: 'none' }}>{l}</a>
+            ))}
           </div>
         </div>
       </footer>
