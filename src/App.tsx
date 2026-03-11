@@ -19,6 +19,8 @@ import BillingPage from './pages/BillingPage';
 import Portfolio from './pages/Portfolio';
 import AIStrategyBuilderPage from './pages/AIStrategyBuilderPage';
 import BrokerIntegrationPage from './pages/BrokerIntegrationPage';
+import OptionChainPage from './pages/OptionChainPage';
+import NewsInsightsPage from './pages/NewsInsightsPage';
 import LoadingScreen from './components/ui/LoadingScreen';
 
 // Protected Route Component
@@ -64,6 +66,8 @@ function App() {
               <Route path="/broker-integration" element={<ProtectedRoute><BrokerIntegrationPage /></ProtectedRoute>} />
               <Route path="/backtesting" element={<ProtectedRoute><BacktestingPage /></ProtectedRoute>} />
               <Route path="/portfolio" element={<ProtectedRoute><Portfolio /></ProtectedRoute>} />
+              <Route path="/option-chain" element={<ProtectedRoute><OptionChainPage /></ProtectedRoute>} />
+              <Route path="/news-insights" element={<ProtectedRoute><NewsInsightsPage /></ProtectedRoute>} />
               <Route path="/risk-management" element={<ProtectedRoute><RiskManagementPage /></ProtectedRoute>} />
               <Route path="/learning" element={<ProtectedRoute><LearningHubPage /></ProtectedRoute>} />
               <Route path="/community" element={<ProtectedRoute><CommunityPage /></ProtectedRoute>} />

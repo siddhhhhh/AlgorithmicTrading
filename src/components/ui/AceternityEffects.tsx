@@ -2354,3 +2354,217 @@ export const LayerStack: React.FC<{
     );
 };
 
+/* ═══════════════════════ HEAT MAP ══════════════════════════ */
+/* Color-shifting grid overlay that maps mouse position to heatmap */
+export const HeatMap: React.FC<{
+    children: React.ReactNode;
+    style?: React.CSSProperties;
+    className?: string;
+    hotColor?: string;
+    coldColor?: string;
+    cellSize?: number;
+}> = ({ children, style = {}, className = '', hotColor = 'rgba(239,68,68,0.25)', coldColor = 'rgba(59,130,246,0.05)', cellSize = 40 }) => {
+    const ref = useRef<HTMLDivElement>(null);
+    const [mousePos, setMousePos] = useState({ x: -1000, y: -1000 });
+    const [dims, setDims] = useState({ w: 0, h: 0 });
+    useEffect(() => {
+        if (ref.current) {
+            const r = ref.current.getBoundingClientRect();
+            setDims({ w: r.width, h: r.height });
+        }
+    }, []);
+    const cols = Math.ceil(dims.w / cellSize) || 1;
+    const rows = Math.ceil(dims.h / cellSize) || 1;
+    return (
+        <div ref={ref} className={className}
+            style={{ position: 'relative', overflow: 'hidden', ...style }}
+            onMouseMove={e => {
+                if (!ref.current) return;
+                const r = ref.current.getBoundingClientRect();
+                setMousePos({ x: e.clientX - r.left, y: e.clientY - r.top });
+            }}
+            onMouseLeave={() => setMousePos({ x: -1000, y: -1000 })}
+        >
+            <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 0, display: 'grid', gridTemplateColumns: `repeat(${cols}, 1fr)`, gridTemplateRows: `repeat(${rows}, 1fr)` }}>
+                {Array.from({ length: cols * rows }).map((_, i) => {
+                    const col = i % cols;
+                    const row = Math.floor(i / cols);
+                    const cx = (col + 0.5) * cellSize;
+                    const cy = (row + 0.5) * cellSize;
+                    const dist = Math.sqrt((mousePos.x - cx) ** 2 + (mousePos.y - cy) ** 2);
+                    const maxDist = 200;
+                    const intensity = Math.max(0, 1 - dist / maxDist);
+                    return (
+                        <div key={i} style={{
+                            background: intensity > 0.1 ? hotColor : coldColor,
+                            opacity: 0.15 + intensity * 0.6,
+                            transition: 'all 0.15s ease',
+                            borderRadius: 2,
+                        }} />
+                    );
+                })}
+            </div>
+            <div style={{ position: 'relative', zIndex: 1 }}>{children}</div>
+        </div>
+    );
+};
+
+/* ═══════════════════════ SONAR PING ══════════════════════ */
+/* Rotating sonar/ping sweep animation overlay */
+export const SonarPing: React.FC<{
+    children: React.ReactNode;
+    style?: React.CSSProperties;
+    className?: string;
+    color?: string;
+    speed?: number;
+    size?: number;
+}> = ({ children, style = {}, className = '', color = 'rgba(16,185,129,0.4)', speed = 3, size = 300 }) => {
+    const id = useRef(`radar-${Math.random().toString(36).slice(2)}`).current;
+    return (
+        <div className={className} style={{ position: 'relative', overflow: 'hidden', ...style }}>
+            <style>{`@keyframes ${id}{0%{transform:translate(-50%,-50%) rotate(0deg)}100%{transform:translate(-50%,-50%) rotate(360deg)}}`}</style>
+            <div style={{
+                position: 'absolute', top: '50%', left: '50%', width: size, height: size,
+                background: `conic-gradient(from 0deg, transparent 0%, transparent 70%, ${color} 85%, transparent 100%)`,
+                borderRadius: '50%', animation: `${id} ${speed}s linear infinite`,
+                transform: 'translate(-50%, -50%)', pointerEvents: 'none', zIndex: 0,
+                filter: 'blur(2px)',
+            }} />
+            {/* Cross-hairs */}
+            <div style={{
+                position: 'absolute', top: '50%', left: 0, right: 0, height: 1,
+                background: `linear-gradient(90deg, transparent 10%, ${color.replace(/[\d.]+\)$/, '0.15)')} 50%, transparent 90%)`,
+                pointerEvents: 'none', zIndex: 0,
+            }} />
+            <div style={{
+                position: 'absolute', left: '50%', top: 0, bottom: 0, width: 1,
+                background: `linear-gradient(180deg, transparent 10%, ${color.replace(/[\d.]+\)$/, '0.15)')} 50%, transparent 90%)`,
+                pointerEvents: 'none', zIndex: 0,
+            }} />
+            <div style={{ position: 'relative', zIndex: 1 }}>{children}</div>
+        </div>
+    );
+};
+
+/* ═══════════════════════ NEON PULSE ══════════════════════ */
+/* Container with pulsing neon border glow effect */
+export const NeonPulse: React.FC<{
+    children: React.ReactNode;
+    style?: React.CSSProperties;
+    className?: string;
+    color?: string;
+    intensity?: number;
+    speed?: number;
+}> = ({ children, style = {}, className = '', color = '#06b6d4', intensity = 1, speed = 2 }) => {
+    const id = useRef(`neon-${Math.random().toString(36).slice(2)}`).current;
+    return (
+        <div className={className} style={{ position: 'relative', ...style }}>
+            <style>{`
+                @keyframes ${id}{
+                    0%,100%{box-shadow:0 0 ${5*intensity}px ${color}40, 0 0 ${15*intensity}px ${color}20, inset 0 0 ${5*intensity}px ${color}10}
+                    50%{box-shadow:0 0 ${15*intensity}px ${color}60, 0 0 ${40*intensity}px ${color}30, inset 0 0 ${10*intensity}px ${color}15}
+                }
+            `}</style>
+            <div style={{
+                borderRadius: 'inherit', border: `1px solid ${color}40`,
+                animation: `${id} ${speed}s ease-in-out infinite`,
+                padding: 'inherit',
+            }}>
+                {children}
+            </div>
+        </div>
+    );
+};
+
+/* ═══════════════════════ WAVEFORM LINE ══════════════════════ */
+/* Animated sine wave SVG line background */
+export const WaveformLine: React.FC<{
+    style?: React.CSSProperties;
+    className?: string;
+    color?: string;
+    amplitude?: number;
+    frequency?: number;
+    speed?: number;
+    height?: number;
+}> = ({ style = {}, className = '', color = '#6366f1', amplitude = 20, frequency = 3, speed = 2, height = 60 }) => {
+    const id = useRef(`wave-${Math.random().toString(36).slice(2)}`).current;
+    const points = Array.from({ length: 100 }, (_, i) => {
+        const x = (i / 99) * 100;
+        const y = 50 + Math.sin((i / 99) * Math.PI * 2 * frequency) * amplitude;
+        return `${x},${y}`;
+    }).join(' ');
+    return (
+        <div className={className} style={{ position: 'relative', height, overflow: 'hidden', ...style }}>
+            <style>{`@keyframes ${id}{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}`}</style>
+            <svg viewBox={`0 0 200 100`} preserveAspectRatio="none"
+                style={{ position: 'absolute', inset: 0, width: '200%', height: '100%', animation: `${id} ${speed}s linear infinite` }}>
+                <polyline points={points} fill="none" stroke={color} strokeWidth="2" opacity="0.4" />
+                <polyline points={points.split(' ').map(p => { const [x, y] = p.split(','); return `${parseFloat(x) + 100},${y}`; }).join(' ')}
+                    fill="none" stroke={color} strokeWidth="2" opacity="0.4" />
+            </svg>
+            <svg viewBox={`0 0 200 100`} preserveAspectRatio="none"
+                style={{ position: 'absolute', inset: 0, width: '200%', height: '100%', animation: `${id} ${speed * 1.5}s linear infinite`, opacity: 0.2 }}>
+                <polyline points={Array.from({ length: 100 }, (_, i) => {
+                    const x = (i / 99) * 100;
+                    const y = 50 + Math.cos((i / 99) * Math.PI * 2 * frequency * 1.3) * amplitude * 0.6;
+                    return `${x},${y}`;
+                }).join(' ')} fill="none" stroke={color} strokeWidth="1.5" />
+            </svg>
+        </div>
+    );
+};
+
+/* ═══════════════════════ HOLOGRAPHIC CARD ══════════════════════ */
+/* Card with rainbow holographic shimmer effect on mouse move */
+export const HolographicCard: React.FC<{
+    children: React.ReactNode;
+    style?: React.CSSProperties;
+    className?: string;
+    intensity?: number;
+}> = ({ children, style = {}, className = '', intensity = 0.15 }) => {
+    const ref = useRef<HTMLDivElement>(null);
+    const [pos, setPos] = useState({ x: 50, y: 50 });
+    const [hovering, setHovering] = useState(false);
+    return (
+        <div ref={ref} className={className}
+            style={{
+                position: 'relative', overflow: 'hidden', borderRadius: 16,
+                transition: 'transform 0.3s cubic-bezier(0.4,0,0.2,1)',
+                transform: hovering ? 'translateY(-2px) scale(1.005)' : 'none',
+                ...style,
+            }}
+            onMouseMove={e => {
+                if (!ref.current) return;
+                const r = ref.current.getBoundingClientRect();
+                setPos({ x: ((e.clientX - r.left) / r.width) * 100, y: ((e.clientY - r.top) / r.height) * 100 });
+            }}
+            onMouseEnter={() => setHovering(true)}
+            onMouseLeave={() => { setHovering(false); setPos({ x: 50, y: 50 }); }}
+        >
+            {/* Holographic rainbow overlay */}
+            <div style={{
+                position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 2,
+                background: `
+                    radial-gradient(600px circle at ${pos.x}% ${pos.y}%, 
+                        rgba(255,0,128,${intensity}) 0%, 
+                        rgba(0,255,255,${intensity * 0.8}) 25%, 
+                        rgba(128,0,255,${intensity * 0.6}) 50%, 
+                        rgba(255,255,0,${intensity * 0.4}) 75%,
+                        transparent 100%
+                    )`,
+                opacity: hovering ? 1 : 0,
+                transition: 'opacity 0.3s ease',
+                mixBlendMode: 'overlay',
+            }} />
+            {/* Specular highlight */}
+            <div style={{
+                position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 3,
+                background: `radial-gradient(250px circle at ${pos.x}% ${pos.y}%, rgba(255,255,255,0.15), transparent 60%)`,
+                opacity: hovering ? 1 : 0,
+                transition: 'opacity 0.2s',
+            }} />
+            <div style={{ position: 'relative', zIndex: 1 }}>{children}</div>
+        </div>
+    );
+};
+

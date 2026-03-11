@@ -6,3 +6,6 @@ numpy
 requests
 groq
 python-dotenv
+feedparser
+pnsea
+stealthkit

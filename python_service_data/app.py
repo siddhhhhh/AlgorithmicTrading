@@ -379,82 +379,477 @@ def run_backtest():
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
+# ── NSE helpers ───────────────────────────────────────────────────────────────
+NSE_INDEX_SYMBOLS = {"NIFTY", "BANKNIFTY", "FINNIFTY", "NIFTY BANK", "NIFTY 50", "MIDCPNIFTY", "NIFTYNXT50"}
+OPTION_EQUITY_SYMBOLS = [
+    "RELIANCE", "TCS", "HDFCBANK", "ICICIBANK", "INFY", "SBIN", "BAJFINANCE",
+    "TATAMOTORS", "LT", "AXISBANK", "MARUTI", "SUNPHARMA", "WIPRO", "HCLTECH",
+    "TATASTEEL", "HINDALCO", "ONGC", "NTPC", "POWERGRID", "COALINDIA",
+    "ITC", "BHARTIARTL", "ADANIENT", "ADANIPORTS", "KOTAKBANK",
+    "TITAN", "ULTRACEMCO", "TECHM", "HINDUNILVR", "JSWSTEEL",
+]
+
+import time as _time
+import threading
+import json as _json
+import os as _os
+
+# Singleton pnsea NSE session (thread-safe)
+_pnsea_nse = None
+_pnsea_lock = threading.Lock()
+
+# In-memory cache for option chain data
+_nse_cache = {}
+_nse_cache_lock = threading.Lock()
+NSE_CACHE_TTL = 180  # 3 minutes
+
+# Disk cache directory for persistent storage across restarts / after-hours
+_NSE_DISK_CACHE_DIR = _os.path.join(_os.path.dirname(__file__), ".nse_cache")
+_os.makedirs(_NSE_DISK_CACHE_DIR, exist_ok=True)
+
+def _get_pnsea():
+    """Get or create the singleton pnsea NSE session."""
+    global _pnsea_nse
+    if _pnsea_nse is None:
+        with _pnsea_lock:
+            if _pnsea_nse is None:
+                from pnsea import NSE
+                _pnsea_nse = NSE()
+                print("  ✓ pnsea NSE session created")
+    return _pnsea_nse
+
+
+def _disk_cache_path(cache_key):
+    return _os.path.join(_NSE_DISK_CACHE_DIR, f"{cache_key}.json")
+
+
+def _save_to_disk(cache_key, df, expiry_dates, underlying_value):
+    """Save option chain data to disk as JSON for after-hours access."""
+    try:
+        # Convert DataFrame to list of dicts, handling NaN/None
+        rows = []
+        for _, row in df.iterrows():
+            r = {}
+            for col in df.columns:
+                val = row[col]
+                if val is None or (isinstance(val, float) and np.isnan(val)):
+                    r[col] = None
+                else:
+                    r[col] = val if not isinstance(val, (np.integer, np.floating)) else val.item()
+            rows.append(r)
+
+        payload = {
+            "rows": rows,
+            "expiry_dates": expiry_dates,
+            "underlying_value": underlying_value,
+            "cached_at": _time.strftime("%Y-%m-%d %H:%M:%S"),
+            "ts": _time.time(),
+        }
+        with open(_disk_cache_path(cache_key), "w") as f:
+            _json.dump(payload, f)
+        print(f"  💾 Saved {len(rows)} rows to disk cache")
+    except Exception as e:
+        print(f"  ⚠ Disk cache save failed: {e}")
+
+
+def _load_from_disk(cache_key):
+    """Load option chain data from disk cache. Returns (df, expiry_dates, underlying_value, cached_at) or None."""
+    path = _disk_cache_path(cache_key)
+    if not _os.path.exists(path):
+        return None
+    try:
+        with open(path, "r") as f:
+            payload = _json.load(f)
+        import pandas as _pd
+        df = _pd.DataFrame(payload["rows"])
+        expiry_dates = payload.get("expiry_dates", [])
+        underlying_value = payload.get("underlying_value", 0)
+        cached_at = payload.get("cached_at", "unknown")
+        print(f"  📂 Loaded {len(df)} rows from disk cache (saved at {cached_at})")
+        return (df, expiry_dates, underlying_value, cached_at)
+    except Exception as e:
+        print(f"  ⚠ Disk cache load failed: {e}")
+        return None
+
+
+def fetch_nse_option_chain(symbol, is_index):
+    """Fetch option chain from NSE using pnsea library.
+    pnsea returns: (DataFrame, expiry_dates_list, underlying_value_float)
+    We return:     (df, expiry_dates, underlying_value, cached_at_or_None)
+    """
+    cache_key = f"{symbol}_{is_index}"
+
+    # Check in-memory cache first
+    with _nse_cache_lock:
+        cached = _nse_cache.get(cache_key)
+        if cached and (_time.time() - cached["ts"]) < NSE_CACHE_TTL:
+            age = int(_time.time() - cached["ts"])
+            print(f"  ✓ Using cached data ({age}s old)")
+            return cached["result"]
+
+    nse = _get_pnsea()
+    last_error = None
+    for attempt in range(2):
+        try:
+            print(f"  → pnsea attempt {attempt + 1}: {symbol} ({'index' if is_index else 'equity'})...")
+            if is_index:
+                result = nse.options.option_chain(symbol)
+            else:
+                result = nse.equityOptions.option_chain(symbol)
+
+            # pnsea returns: (DataFrame, expiry_dates_list, underlying_value_float)
+            df = result[0]
+            expiry_dates = result[1] if len(result) > 1 else []
+            underlying_value = result[2] if len(result) > 2 else 0
+
+            # Ensure types are correct
+            if not isinstance(expiry_dates, list):
+                expiry_dates = []
+            if not isinstance(underlying_value, (int, float)):
+                underlying_value = 0
+
+            if df is not None and len(df) > 0:
+                print(f"  ✓ Got {len(df)} rows via pnsea")
+                res = (df, expiry_dates, underlying_value, None)  # None = live data
+                with _nse_cache_lock:
+                    _nse_cache[cache_key] = {"result": res, "ts": _time.time()}
+                # Save to disk for after-hours access
+                _save_to_disk(cache_key, df, expiry_dates, underlying_value)
+                return res
+            else:
+                last_error = "pnsea returned empty data"
+                print(f"  ⚠ {last_error}")
+        except Exception as e:
+            last_error = str(e)
+            print(f"  ⚠ pnsea failed: {e}")
+            # Reset session on error
+            global _pnsea_nse
+            _pnsea_nse = None
+
+        if attempt < 1:
+            _time.sleep(2)
+
+    # Return stale in-memory cache if available
+    with _nse_cache_lock:
+        if cached:
+            print(f"  ↳ Returning stale in-memory cache")
+            return cached["result"]
+
+    # Fall back to disk cache (for after-hours / server restart)
+    disk_data = _load_from_disk(cache_key)
+    if disk_data:
+        return disk_data
+
+    raise Exception(f"NSE option chain unavailable: {last_error}")
+
+
 # ── /api/options/<symbol> ─────────────────────────────────────────────────────
 @app.route("/api/options/<symbol>")
 def get_options(symbol):
     try:
-        sym = symbol.upper()
-        # NSE public API for options data
-        nse_sym = sym  # e.g. NIFTY, BANKNIFTY, RELIANCE
-        url = f"https://www.nseindia.com/api/option-chain-indices?symbol={nse_sym}"
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
-            "Accept": "*/*",
-            "Accept-Language": "en-US,en;q=0.9",
-            "Referer": "https://www.nseindia.com/",
-        }
-        # First hit the main page to get cookies
-        sess = requests.Session()
-        sess.get("https://www.nseindia.com/", headers=headers, timeout=10)
-        resp = sess.get(url, headers=headers, timeout=10)
-        data = resp.json()
+        sym = symbol.upper().strip()
+        expiry_param = request.args.get("expiry", None)
 
-        records = data.get("records", {})
-        expiry_dates = records.get("expiryDates", [])
-        underlying_value = records.get("underlyingValue", 0)
-        data_rows = records.get("data", [])
+        is_index = sym in NSE_INDEX_SYMBOLS or sym in ("NIFTY", "BANKNIFTY", "FINNIFTY", "MIDCPNIFTY", "NIFTYNXT50")
 
-        # Use first expiry
-        target_expiry = expiry_dates[0] if expiry_dates else None
+        print(f"\n📊 Fetching option chain for {sym} (is_index={is_index})")
+        try:
+            result = fetch_nse_option_chain(sym, is_index)
+            df = result[0]
+            expiry_dates = result[1]
+            underlying_value = result[2]
+            cached_at = result[3] if len(result) > 3 else None
+        except Exception as fetch_err:
+            err_msg = str(fetch_err)
+            print(f"  ⚠ Fetch failed: {err_msg}")
+            if "empty" in err_msg.lower() or "closed" in err_msg.lower() or "unavailable" in err_msg.lower():
+                return jsonify({
+                    "error": "NSE option chain data is currently unavailable. This typically happens after market hours (NSE: 9:15 AM - 3:30 PM IST).",
+                    "market_closed": True,
+                    "symbol": sym,
+                })
+            return jsonify({"error": f"Failed to fetch option chain: {err_msg}"}), 500
 
+        # underlying_value is already a float from pnsea
+        underlying_value = safe_float(underlying_value) or 0
+
+        # expiry_dates is already a list from pnsea
+        if not isinstance(expiry_dates, list):
+            expiry_dates = []
+
+        target_expiry = expiry_param if expiry_param and expiry_param in expiry_dates else (expiry_dates[0] if expiry_dates else None)
+
+        # Transform pnsea DataFrame to frontend format
+        # pnsea columns: strikePrice, CE_openInterest, CE_changeinOpenInterest, CE_impliedVolatility,
+        #   CE_lastPrice, CE_totalTradedVolume, CE_bidQty, CE_bidprice, CE_askQty, CE_askPrice,
+        #   PE_openInterest, PE_changeinOpenInterest, PE_impliedVolatility, PE_lastPrice,
+        #   PE_totalTradedVolume, PE_bidQty, PE_bidprice, PE_askQty, PE_askPrice
         calls = []
         puts = []
-        for row in data_rows:
-            if target_expiry and row.get("expiryDate") != target_expiry:
-                continue
-            strike = row.get("strikePrice", 0)
-            if "CE" in row:
-                ce = row["CE"]
-                calls.append({
-                    "strike": strike,
-                    "ltp": safe_float(ce.get("lastPrice")),
-                    "volume": safe_float(ce.get("totalTradedVolume")),
-                    "oi": safe_float(ce.get("openInterest")),
-                    "iv": safe_float(ce.get("impliedVolatility")),
-                    "change": safe_float(ce.get("change")),
-                    "changePct": safe_float(ce.get("pChange")),
-                })
-            if "PE" in row:
-                pe = row["PE"]
-                puts.append({
-                    "strike": strike,
-                    "ltp": safe_float(pe.get("lastPrice")),
-                    "volume": safe_float(pe.get("totalTradedVolume")),
-                    "oi": safe_float(pe.get("openInterest")),
-                    "iv": safe_float(pe.get("impliedVolatility")),
-                    "change": safe_float(pe.get("change")),
-                    "changePct": safe_float(pe.get("pChange")),
-                })
+        call_oi_map = {}
+        put_oi_map = {}
+        total_ce_oi = 0
+        total_pe_oi = 0
+        total_ce_volume = 0
+        total_pe_volume = 0
 
-        return jsonify({
+        for _, row in df.iterrows():
+            strike = int(row.get("strikePrice", 0))
+            if strike == 0:
+                continue
+
+            # CE (Call) data
+            ce_oi = safe_float(row.get("CE_openInterest")) or 0
+            ce_vol = safe_float(row.get("CE_totalTradedVolume")) or 0
+            total_ce_oi += ce_oi
+            total_ce_volume += ce_vol
+            call_oi_map[strike] = ce_oi
+            calls.append({
+                "strike": strike,
+                "ltp": safe_float(row.get("CE_lastPrice")),
+                "change": safe_float(row.get("CE_change")),
+                "changePct": safe_float(row.get("CE_pChange")),
+                "volume": ce_vol,
+                "oi": ce_oi,
+                "oiChange": safe_float(row.get("CE_changeinOpenInterest")),
+                "iv": safe_float(row.get("CE_impliedVolatility")),
+                "bidPrice": safe_float(row.get("CE_bidprice")),
+                "askPrice": safe_float(row.get("CE_askPrice")),
+                "bidQty": safe_float(row.get("CE_bidQty")),
+                "askQty": safe_float(row.get("CE_askQty")),
+            })
+
+            # PE (Put) data
+            pe_oi = safe_float(row.get("PE_openInterest")) or 0
+            pe_vol = safe_float(row.get("PE_totalTradedVolume")) or 0
+            total_pe_oi += pe_oi
+            total_pe_volume += pe_vol
+            put_oi_map[strike] = pe_oi
+            puts.append({
+                "strike": strike,
+                "ltp": safe_float(row.get("PE_lastPrice")),
+                "change": safe_float(row.get("PE_change")),
+                "changePct": safe_float(row.get("PE_pChange")),
+                "volume": pe_vol,
+                "oi": pe_oi,
+                "oiChange": safe_float(row.get("PE_changeinOpenInterest")),
+                "iv": safe_float(row.get("PE_impliedVolatility")),
+                "bidPrice": safe_float(row.get("PE_bidprice")),
+                "askPrice": safe_float(row.get("PE_askPrice")),
+                "bidQty": safe_float(row.get("PE_bidQty")),
+                "askQty": safe_float(row.get("PE_askQty")),
+            })
+
+        # PCR ratio
+        pcr = round(total_pe_oi / total_ce_oi, 4) if total_ce_oi > 0 else 0
+
+        # Max Pain calculation
+        all_strikes = sorted(set(s["strike"] for s in calls + puts))
+        max_pain_strike = 0
+        min_pain = float("inf")
+        for test_strike in all_strikes:
+            pain = 0
+            for s in all_strikes:
+                ce_oi = call_oi_map.get(s, 0)
+                pe_oi = put_oi_map.get(s, 0)
+                if test_strike > s:
+                    pain += ce_oi * (test_strike - s)
+                elif test_strike < s:
+                    pain += pe_oi * (s - test_strike)
+            if pain < min_pain:
+                min_pain = pain
+                max_pain_strike = test_strike
+
+        resp_data = {
             "symbol": sym,
+            "isIndex": is_index,
             "underlyingValue": underlying_value,
-            "expiryDates": expiry_dates[:6],
+            "expiryDates": expiry_dates[:12] if expiry_dates else [],
             "selectedExpiry": target_expiry,
-            "calls": calls[:30],
-            "puts": puts[:30],
-        })
+            "calls": calls,
+            "puts": puts,
+            "summary": {
+                "totalCeOi": total_ce_oi,
+                "totalPeOi": total_pe_oi,
+                "totalCeVolume": total_ce_volume,
+                "totalPeVolume": total_pe_volume,
+                "pcr": pcr,
+                "maxPain": max_pain_strike,
+            },
+        }
+        if cached_at:
+            resp_data["cachedAt"] = cached_at
+        return jsonify(resp_data)
     except Exception as e:
-        # Return mock data if NSE API fails
+        import traceback
+        traceback.print_exc()
         return jsonify({
             "symbol": symbol.upper(),
             "underlyingValue": 23500,
-            "expiryDates": ["27-Mar-2025", "03-Apr-2025"],
+            "expiryDates": ["27-Mar-2025", "03-Apr-2025", "10-Apr-2025"],
             "selectedExpiry": "27-Mar-2025",
             "calls": [],
             "puts": [],
+            "summary": {"totalCeOi": 0, "totalPeOi": 0, "totalCeVolume": 0, "totalPeVolume": 0, "pcr": 0, "maxPain": 0},
             "error": f"Options data unavailable: {str(e)}",
         })
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# NEWS-BASED MARKET INSIGHTS  (Google News RSS + Groq AI)
+# ══════════════════════════════════════════════════════════════════════════════
+import feedparser
+from html import unescape
+import re
+
+NEWS_FEEDS = [
+    # General Indian market
+    ("General Market", "https://news.google.com/rss/search?q=Indian+stock+market+NSE+BSE+Sensex+Nifty&hl=en-IN&gl=IN&ceid=IN:en"),
+    # Sector-specific
+    ("Banking", "https://news.google.com/rss/search?q=India+banking+sector+RBI+HDFC+ICICI+SBI+stock&hl=en-IN&gl=IN&ceid=IN:en"),
+    ("IT", "https://news.google.com/rss/search?q=India+IT+sector+Infosys+TCS+Wipro+HCL+tech+stock&hl=en-IN&gl=IN&ceid=IN:en"),
+    ("Metals", "https://news.google.com/rss/search?q=India+metals+steel+aluminum+copper+Tata+Steel+Hindalco+JSW&hl=en-IN&gl=IN&ceid=IN:en"),
+    ("Energy", "https://news.google.com/rss/search?q=India+oil+gas+energy+ONGC+Reliance+BPCL+crude+stock&hl=en-IN&gl=IN&ceid=IN:en"),
+    ("Pharma", "https://news.google.com/rss/search?q=India+pharma+healthcare+Sun+Pharma+Cipla+Dr+Reddy+stock&hl=en-IN&gl=IN&ceid=IN:en"),
+    ("Auto", "https://news.google.com/rss/search?q=India+automobile+Maruti+Tata+Motors+Bajaj+auto+stock&hl=en-IN&gl=IN&ceid=IN:en"),
+    ("FMCG", "https://news.google.com/rss/search?q=India+FMCG+Hindustan+Unilever+ITC+Nestle+Britannia+stock&hl=en-IN&gl=IN&ceid=IN:en"),
+    ("Infra & Realty", "https://news.google.com/rss/search?q=India+infrastructure+real+estate+L%26T+Adani+DLF+stock&hl=en-IN&gl=IN&ceid=IN:en"),
+    # Geopolitical & global
+    ("Global Impact", "https://news.google.com/rss/search?q=geopolitical+trade+war+tariffs+impact+India+market&hl=en-IN&gl=IN&ceid=IN:en"),
+]
+
+def clean_html(raw):
+    """Strip HTML tags and unescape."""
+    return unescape(re.sub(r"<[^>]+>", "", str(raw or "")))
+
+
+NEWS_AI_PROMPT = """You are AlgoForge Market Intelligence AI — an expert financial analyst specializing in the Indian stock market (NSE/BSE).
+
+You will receive a batch of recent news headlines from Google News, grouped by category (General Market, Banking, IT, Metals, Energy, Pharma, Auto, FMCG, Infra & Realty, Global Impact).
+
+Analyze ALL these headlines and return ONLY valid JSON (no markdown, no explanation outside JSON) with this exact structure:
+
+{
+  "overallSentiment": "bullish" | "bearish" | "neutral",
+  "overallSentimentScore": 1-10,
+  "marketOutlook": "A 2-3 sentence summary of the overall Indian market outlook based on the news",
+  "sectors": [
+    {
+      "name": "Banking",
+      "sentiment": "bullish" | "bearish" | "neutral",
+      "impactScore": 1-10,
+      "outlook": "Brief 1-2 sentence outlook for this sector",
+      "drivers": ["Key driver 1", "Key driver 2"],
+      "relatedHeadlines": ["Relevant headline 1", "Relevant headline 2"]
+    }
+  ],
+  "companyMentions": [
+    {
+      "name": "Company Name",
+      "ticker": "NSE Symbol",
+      "impact": "positive" | "negative" | "neutral",
+      "reason": "Brief reason for impact",
+      "sector": "Sector name"
+    }
+  ],
+  "keyRisks": ["Risk 1", "Risk 2", "Risk 3"],
+  "keyOpportunities": ["Opportunity 1", "Opportunity 2", "Opportunity 3"],
+  "globalFactors": ["Factor 1", "Factor 2"],
+  "confidence": 1-10,
+  "analysisTimestamp": "current timestamp"
+}
+
+Rules:
+- Analyze ALL sectors: Banking, IT, Metals, Energy, Pharma, Auto, FMCG, Infra & Realty. Always include all 8.
+- Be specific about Indian companies and NSE symbols.
+- Consider geopolitical events (wars, sanctions, trade deals) and their impact on Indian sectors.
+- Impact score: 1 = no impact, 5 = moderate, 10 = massive impact.
+- Include at least 3-5 company mentions with real NSE symbols.
+- Be honest about confidence level.
+"""
+
+
+@app.route("/api/news/market-insights")
+def get_news_insights():
+    try:
+        # 1. Fetch all RSS feeds
+        all_news = []
+        headlines_by_category = {}
+        for category, feed_url in NEWS_FEEDS:
+            try:
+                feed = feedparser.parse(feed_url)
+                items = []
+                for entry in feed.entries[:8]:  # top 8 per category
+                    title = clean_html(entry.get("title", ""))
+                    source = ""
+                    if " - " in title:
+                        parts = title.rsplit(" - ", 1)
+                        title = parts[0].strip()
+                        source = parts[1].strip() if len(parts) > 1 else ""
+                    items.append({
+                        "title": title,
+                        "source": source or clean_html(entry.get("source", {}).get("title", "")),
+                        "link": entry.get("link", ""),
+                        "published": entry.get("published", ""),
+                        "category": category,
+                    })
+                    all_news.append(items[-1])
+                headlines_by_category[category] = [item["title"] for item in items]
+            except Exception as ex:
+                print(f"⚠ RSS feed error for {category}: {ex}")
+                headlines_by_category[category] = []
+
+        # 2. Build prompt for Groq AI
+        news_text = ""
+        for cat, headlines in headlines_by_category.items():
+            if headlines:
+                news_text += f"\n## {cat}\n"
+                for h in headlines:
+                    news_text += f"- {h}\n"
+
+        if not news_text.strip():
+            return jsonify({"error": "Could not fetch any news articles. Try again later."}), 503
+
+        # 3. Call Groq AI for analysis
+        client = get_groq()
+        chat = client.chat.completions.create(
+            model=GROQ_MODEL,
+            messages=[
+                {"role": "system", "content": NEWS_AI_PROMPT},
+                {"role": "user", "content": f"Here are the latest Indian market news headlines:\n{news_text}\n\nAnalyze these and provide sector-wise insights for the Indian stock market."},
+            ],
+            temperature=0.4,
+            max_tokens=4096,
+            response_format={"type": "json_object"},
+        )
+        raw = chat.choices[0].message.content
+        analysis = json.loads(raw)
+
+        return jsonify({
+            "success": True,
+            "analysis": analysis,
+            "news": all_news[:50],
+            "fetchedAt": datetime.now(timezone.utc).isoformat(),
+            "model": GROQ_MODEL,
+        })
+    except RuntimeError as e:
+        return jsonify({"error": str(e)}), 503
+    except json.JSONDecodeError:
+        return jsonify({"error": "AI returned invalid JSON. Please try again.", "raw": raw}), 500
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": f"News insights failed: {str(e)}"}), 500
+
+
+# ── /api/options/symbols ──────────────────────────────────────────────────────
+@app.route("/api/options/symbols/list")
+def list_option_symbols():
+    """Return available symbols for option chain."""
+    return jsonify({
+        "indices": ["NIFTY", "BANKNIFTY", "FINNIFTY", "MIDCPNIFTY"],
+        "equities": OPTION_EQUITY_SYMBOLS,
+    })
 
 # ── /api/strategy (CRUD) ──────────────────────────────────────────────────────
 @app.route("/api/strategy", methods=["GET"])

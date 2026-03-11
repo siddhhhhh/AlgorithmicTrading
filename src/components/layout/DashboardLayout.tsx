@@ -3,7 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, TrendingUp, Target, BarChart3, Shield,
   BookOpen, Users, CreditCard, Bell, LogOut, ChevronDown,
-  Menu, X, Briefcase, Brain, Link2
+  Menu, X, Briefcase, Brain, Link2, Eye, Newspaper
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useData } from '../../contexts/DataContext';
@@ -20,6 +20,8 @@ const nav = [
   { name: 'Brokers', href: '/broker-integration', icon: Link2 },
   { name: 'Backtesting', href: '/backtesting', icon: BarChart3 },
   { name: 'Portfolio', href: '/portfolio', icon: Briefcase },
+  { name: 'Option Chain', href: '/option-chain', icon: Eye },
+  { name: 'News Insights', href: '/news-insights', icon: Newspaper },
   { name: 'Risk Management', href: '/risk-management', icon: Shield },
   { name: 'Learning Hub', href: '/learning', icon: BookOpen },
   { name: 'Community', href: '/community', icon: Users },
