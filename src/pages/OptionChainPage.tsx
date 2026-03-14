@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import ReactDOM from 'react-dom';
 import DashboardLayout from '../components/layout/DashboardLayout';
 import { useData } from '../contexts/DataContext';
 import {
@@ -36,6 +37,9 @@ const OptionChainPage: React.FC = () => {
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQ, setSearchQ] = useState('');
   const [autoRefresh, setAutoRefresh] = useState(false);
+  const [showAllStrikes, setShowAllStrikes] = useState(false);
+  const tableContainerRef = useRef<HTMLDivElement>(null);
+  const atmRowRef = useRef<HTMLTableRowElement>(null);
 
   // Close dropdown on outside click
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -95,12 +99,38 @@ const OptionChainPage: React.FC = () => {
 
   const summary = data?.summary || {};
   const spot = data?.underlyingValue || 0;
-  const calls = data?.calls || [];
-  const puts = data?.puts || [];
+  const rawCalls: any[] = data?.calls || [];
+  const rawPuts: any[] = data?.puts || [];
+
+  // Filter out strikes where BOTH CE and PE have zero OI, volume, and LTP
+  const { calls, puts } = useMemo(() => {
+    if (showAllStrikes) return { calls: rawCalls, puts: rawPuts };
+    const activeStrikes = new Set<number>();
+    for (const c of rawCalls) {
+      if ((c.oi > 0) || (c.volume > 0) || (c.ltp > 0)) activeStrikes.add(c.strike);
+    }
+    for (const p of rawPuts) {
+      if ((p.oi > 0) || (p.volume > 0) || (p.ltp > 0)) activeStrikes.add(p.strike);
+    }
+    return {
+      calls: rawCalls.filter((c: any) => activeStrikes.has(c.strike)),
+      puts: rawPuts.filter((p: any) => activeStrikes.has(p.strike)),
+    };
+  }, [rawCalls, rawPuts, showAllStrikes]);
+
   const maxOi = Math.max(...calls.map((c: any) => c.oi || 0), ...puts.map((p: any) => p.oi || 0), 1);
 
   const pcrColor = summary.pcr > 1.2 ? '#10b981' : summary.pcr < 0.8 ? '#ef4444' : '#f59e0b';
   const pcrLabel = summary.pcr > 1.2 ? 'Bullish' : summary.pcr < 0.8 ? 'Bearish' : 'Neutral';
+
+  // Auto-scroll to ATM strike when data loads
+  useEffect(() => {
+    if (atmRowRef.current) {
+      setTimeout(() => {
+        atmRowRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 400);
+    }
+  }, [data, showAllStrikes]);
 
   return (
     <DashboardLayout>
@@ -163,8 +193,8 @@ const OptionChainPage: React.FC = () => {
 
         {/* ═══ CONTROLS ═══ */}
         <div style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center', animation: 'fadeUp 0.4s ease both' }}>
-          {/* Symbol selector with outside-click close */}
-          <div style={{ position: 'relative' }} ref={dropdownRef}>
+          {/* Symbol selector */}
+          <div ref={dropdownRef} style={{ position: 'relative' }}>
             <button onClick={() => setSearchOpen(!searchOpen)} style={{
               display: 'flex', alignItems: 'center', gap: 8, padding: '10px 18px', borderRadius: 12,
               border: '2px solid #e2e8f0', background: '#fff', cursor: 'pointer', fontSize: 14, fontWeight: 800,
@@ -176,11 +206,23 @@ const OptionChainPage: React.FC = () => {
               </span>
               <ChevronDown size={14} color="#94a3b8" style={{ transform: searchOpen ? 'rotate(180deg)' : 'rotate(0)', transition: 'transform 0.2s' }} />
             </button>
-            {searchOpen && (
+          </div>
+
+          {/* Dropdown portal - rendered into document.body to escape all stacking contexts */}
+          {searchOpen && ReactDOM.createPortal(
+            <>
+              {/* Backdrop to catch outside clicks */}
+              <div onClick={() => setSearchOpen(false)} style={{
+                position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 99998,
+              }} />
               <div style={{
-                position: 'absolute', top: '100%', left: 0, marginTop: 4, width: 260, maxHeight: 340,
-                background: '#fff', borderRadius: 14, border: '1px solid #e2e8f0', boxShadow: '0 12px 40px rgba(0,0,0,0.12)',
-                zIndex: 50, overflow: 'hidden',
+                position: 'fixed',
+                top: (dropdownRef.current?.getBoundingClientRect().bottom ?? 150) + 4,
+                left: dropdownRef.current?.getBoundingClientRect().left ?? 300,
+                width: 280, maxHeight: 450,
+                background: '#fff', borderRadius: 14, border: '1px solid #e2e8f0',
+                boxShadow: '0 20px 60px rgba(0,0,0,0.25)',
+                zIndex: 99999, overflow: 'hidden',
               }}>
                 <div style={{ padding: '8px 12px', borderBottom: '1px solid #f1f5f9' }}>
                   <div style={{ position: 'relative' }}>
@@ -192,17 +234,19 @@ const OptionChainPage: React.FC = () => {
                       }} />
                   </div>
                 </div>
-                <div style={{ maxHeight: 260, overflow: 'auto' }}>
+                <div style={{ maxHeight: 370, overflowY: 'auto', overflowX: 'hidden' }}>
                   {INDEX_SYMBOLS.filter(s => !searchQ || s.includes(searchQ.toUpperCase())).length > 0 && (
                     <div style={{ padding: '6px 12px', fontSize: 9, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 1 }}>Indices</div>
                   )}
                   {INDEX_SYMBOLS.filter(s => !searchQ || s.includes(searchQ.toUpperCase())).map(s => (
-                    <button key={s} onClick={() => { setSymbol(s); setSearchOpen(false); setSearchQ(''); }}
+                    <button key={s} onMouseDown={(e) => { e.stopPropagation(); e.preventDefault(); setSymbol(s); setSearchOpen(false); setSearchQ(''); }}
                       style={{
-                        display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '8px 12px', border: 'none',
+                        display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '10px 14px', border: 'none',
                         background: symbol === s ? '#f0f9ff' : 'transparent',
-                        fontSize: 12, fontWeight: 700, color: '#1e293b', cursor: 'pointer', textAlign: 'left',
+                        fontSize: 13, fontWeight: 700, color: '#1e293b', cursor: 'pointer', textAlign: 'left',
                       }}
+                      onMouseEnter={e => { e.currentTarget.style.background = '#f0f9ff' }}
+                      onMouseLeave={e => { e.currentTarget.style.background = symbol === s ? '#f0f9ff' : 'transparent' }}
                     >
                       <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#8b5cf6' }} />
                       {s}
@@ -213,12 +257,14 @@ const OptionChainPage: React.FC = () => {
                     <div style={{ padding: '6px 12px', fontSize: 9, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 1, borderTop: '1px solid #f1f5f9' }}>Equities</div>
                   )}
                   {EQUITY_SYMBOLS.filter(s => !searchQ || s.includes(searchQ.toUpperCase())).map(s => (
-                    <button key={s} onClick={() => { setSymbol(s); setSearchOpen(false); setSearchQ(''); }}
+                    <button key={s} onMouseDown={(e) => { e.stopPropagation(); e.preventDefault(); setSymbol(s); setSearchOpen(false); setSearchQ(''); }}
                       style={{
-                        display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '8px 12px', border: 'none',
+                        display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '10px 14px', border: 'none',
                         background: symbol === s ? '#f0f9ff' : 'transparent',
-                        fontSize: 12, fontWeight: 600, color: '#1e293b', cursor: 'pointer', textAlign: 'left',
+                        fontSize: 13, fontWeight: 600, color: '#1e293b', cursor: 'pointer', textAlign: 'left',
                       }}
+                      onMouseEnter={e => { e.currentTarget.style.background = '#f0f9ff' }}
+                      onMouseLeave={e => { e.currentTarget.style.background = symbol === s ? '#f0f9ff' : 'transparent' }}
                     >
                       <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#06b6d4' }} />
                       {s}
@@ -227,8 +273,9 @@ const OptionChainPage: React.FC = () => {
                   ))}
                 </div>
               </div>
-            )}
-          </div>
+            </>,
+            document.body
+          )}
 
           {/* Expiry selector — uses handleExpiryChange to avoid infinite loop */}
           {data?.expiryDates && data.expiryDates.length > 0 && (
@@ -254,6 +301,19 @@ const OptionChainPage: React.FC = () => {
               <Zap size={14} color="#f59e0b" />
               Spot: ₹{spot.toLocaleString('en-IN', { maximumFractionDigits: 2 })}
             </div>
+          )}
+
+          {/* Show All / Active Only toggle */}
+          {data && !loading && (
+            <label style={{
+              display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, fontWeight: 600,
+              color: '#64748b', cursor: 'pointer', padding: '8px 14px', borderRadius: 10,
+              border: '1px solid #e2e8f0', background: showAllStrikes ? '#fef3c7' : '#f0fdf4',
+            }}>
+              <input type="checkbox" checked={showAllStrikes} onChange={e => setShowAllStrikes(e.target.checked)}
+                style={{ accentColor: '#8b5cf6' }} />
+              {showAllStrikes ? `All (${rawCalls.length})` : `Active (${calls.length})`}
+            </label>
           )}
         </div>
 
@@ -301,9 +361,9 @@ const OptionChainPage: React.FC = () => {
 
         {/* ═══ OPTION CHAIN TABLE ═══ */}
         {data && !loading && (calls.length > 0 || puts.length > 0) && (
-          <div style={{ borderRadius: 16, overflow: 'hidden', border: '1px solid #e2e8f0', animation: 'fadeUp 0.4s ease 0.2s both' }}>
+          <div ref={tableContainerRef} style={{ borderRadius: 16, border: '1px solid #e2e8f0', animation: 'fadeUp 0.4s ease 0.2s both', maxHeight: '65vh', overflowY: 'auto', overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
-              <thead>
+              <thead style={{ position: 'sticky', top: 0, zIndex: 5 }}>
                 <tr>
                   <th colSpan={7} style={{ background: 'linear-gradient(90deg, #dcfce7, #f0fdf4)', color: '#16a34a', textAlign: 'center', padding: '10px 8px', fontSize: 11, fontWeight: 800, letterSpacing: 1, textTransform: 'uppercase' }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
@@ -337,9 +397,12 @@ const OptionChainPage: React.FC = () => {
                   const peOiPct = put?.oi ? (put.oi / maxOi) * 100 : 0;
 
                   return (
-                    <tr key={call.strike} style={{
+                    <tr key={call.strike}
+                      ref={atm ? atmRowRef : undefined}
+                      id={atm ? 'atm-strike' : undefined}
+                      style={{
                       background: atm ? '#fefce8' : ceItm ? 'rgba(16,185,129,0.03)' : peItm ? 'rgba(239,68,68,0.03)' : i % 2 === 0 ? '#fff' : '#fafbfc',
-                      borderBottom: '1px solid #f1f5f9', transition: 'background 0.15s',
+                      borderBottom: atm ? '2px solid #f59e0b' : '1px solid #f1f5f9', transition: 'background 0.15s',
                     }}
                       onMouseEnter={e => { e.currentTarget.style.background = atm ? '#fef9c3' : '#f0f9ff' }}
                       onMouseLeave={e => { e.currentTarget.style.background = atm ? '#fefce8' : ceItm ? 'rgba(16,185,129,0.03)' : peItm ? 'rgba(239,68,68,0.03)' : i % 2 === 0 ? '#fff' : '#fafbfc' }}

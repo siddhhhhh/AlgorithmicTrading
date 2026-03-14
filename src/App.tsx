@@ -21,6 +21,15 @@ import AIStrategyBuilderPage from './pages/AIStrategyBuilderPage';
 import BrokerIntegrationPage from './pages/BrokerIntegrationPage';
 import OptionChainPage from './pages/OptionChainPage';
 import NewsInsightsPage from './pages/NewsInsightsPage';
+import GammaDashboard from './pages/GammaDashboard';
+import OIDashboard from './pages/OIDashboard';
+import MaxPainDashboard from './pages/MaxPainDashboard';
+import VolatilityDashboard from './pages/VolatilityDashboard';
+import StrategyBuilderDashboard from './pages/StrategyBuilderDashboard';
+import OptionsFlowDashboard from './pages/OptionsFlowDashboard';
+import FuturesDashboard from './pages/FuturesDashboard';
+import HeatmapDashboard from './pages/HeatmapDashboard';
+import QuantSignalsDashboard from './pages/QuantSignalsDashboard';
 import LoadingScreen from './components/ui/LoadingScreen';
 
 // Protected Route Component
@@ -68,6 +77,15 @@ function App() {
               <Route path="/portfolio" element={<ProtectedRoute><Portfolio /></ProtectedRoute>} />
               <Route path="/option-chain" element={<ProtectedRoute><OptionChainPage /></ProtectedRoute>} />
               <Route path="/news-insights" element={<ProtectedRoute><NewsInsightsPage /></ProtectedRoute>} />
+              <Route path="/gamma-exposure" element={<ProtectedRoute><GammaDashboard /></ProtectedRoute>} />
+              <Route path="/oi-analysis" element={<ProtectedRoute><OIDashboard /></ProtectedRoute>} />
+              <Route path="/max-pain" element={<ProtectedRoute><MaxPainDashboard /></ProtectedRoute>} />
+              <Route path="/volatility" element={<ProtectedRoute><VolatilityDashboard /></ProtectedRoute>} />
+              <Route path="/strategy-payoff" element={<ProtectedRoute><StrategyBuilderDashboard /></ProtectedRoute>} />
+              <Route path="/options-flow" element={<ProtectedRoute><OptionsFlowDashboard /></ProtectedRoute>} />
+              <Route path="/futures" element={<ProtectedRoute><FuturesDashboard /></ProtectedRoute>} />
+              <Route path="/heatmap" element={<ProtectedRoute><HeatmapDashboard /></ProtectedRoute>} />
+              <Route path="/quant-signals" element={<ProtectedRoute><QuantSignalsDashboard /></ProtectedRoute>} />
               <Route path="/risk-management" element={<ProtectedRoute><RiskManagementPage /></ProtectedRoute>} />
               <Route path="/learning" element={<ProtectedRoute><LearningHubPage /></ProtectedRoute>} />
               <Route path="/community" element={<ProtectedRoute><CommunityPage /></ProtectedRoute>} />

@@ -3,7 +3,8 @@ import { Link, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, TrendingUp, Target, BarChart3, Shield,
   BookOpen, Users, CreditCard, Bell, LogOut, ChevronDown,
-  Menu, X, Briefcase, Brain, Link2, Eye, Newspaper
+  Menu, X, Briefcase, Brain, Link2, Eye, Newspaper,
+  Zap, Activity, Flame, GitBranch, Grid3X3, LineChart, Layers, Gauge
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useData } from '../../contexts/DataContext';
@@ -12,16 +13,31 @@ interface DashboardLayoutProps {
   children: React.ReactNode;
 }
 
-const nav = [
+const navPlatform = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { name: 'Live Market', href: '/market', icon: TrendingUp },
+  { name: 'Option Chain', href: '/option-chain', icon: Eye },
+  { name: 'Portfolio', href: '/portfolio', icon: Briefcase },
+  { name: 'News Insights', href: '/news-insights', icon: Newspaper },
+];
+
+const navQuant = [
+  { name: 'Gamma Exposure', href: '/gamma-exposure', icon: Zap },
+  { name: 'OI Analysis', href: '/oi-analysis', icon: Activity },
+  { name: 'Max Pain', href: '/max-pain', icon: Target },
+  { name: 'Volatility', href: '/volatility', icon: LineChart },
+  { name: 'Strategy Payoff', href: '/strategy-payoff', icon: GitBranch },
+  { name: 'Options Flow', href: '/options-flow', icon: Flame },
+  { name: 'Futures', href: '/futures', icon: Layers },
+  { name: 'Heatmap', href: '/heatmap', icon: Grid3X3 },
+  { name: 'Quant Signals', href: '/quant-signals', icon: Gauge },
+];
+
+const navTools = [
   { name: 'Strategy Builder', href: '/strategy-builder', icon: Target },
   { name: 'AI Strategy', href: '/ai-strategy', icon: Brain },
   { name: 'Brokers', href: '/broker-integration', icon: Link2 },
   { name: 'Backtesting', href: '/backtesting', icon: BarChart3 },
-  { name: 'Portfolio', href: '/portfolio', icon: Briefcase },
-  { name: 'Option Chain', href: '/option-chain', icon: Eye },
-  { name: 'News Insights', href: '/news-insights', icon: Newspaper },
   { name: 'Risk Management', href: '/risk-management', icon: Shield },
   { name: 'Learning Hub', href: '/learning', icon: BookOpen },
   { name: 'Community', href: '/community', icon: Users },
@@ -56,15 +72,32 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
         {/* Nav */}
         <nav className="sidebar-nav">
           <p className="sidebar-section-label">Platform</p>
-          {nav.map(item => {
+          {navPlatform.map(item => {
             const Icon = item.icon;
             return (
-              <Link
-                key={item.href}
-                to={item.href}
-                className={`sidebar-link ${isActive(item.href) ? 'active' : ''}`}
-                onClick={() => setSidebarOpen(false)}
-              >
+              <Link key={item.href} to={item.href} className={`sidebar-link ${isActive(item.href) ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
+                <Icon size={16} />
+                {item.name}
+              </Link>
+            );
+          })}
+
+          <p className="sidebar-section-label" style={{ marginTop: 12 }}>Quant Analytics</p>
+          {navQuant.map(item => {
+            const Icon = item.icon;
+            return (
+              <Link key={item.href} to={item.href} className={`sidebar-link ${isActive(item.href) ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
+                <Icon size={16} />
+                {item.name}
+              </Link>
+            );
+          })}
+
+          <p className="sidebar-section-label" style={{ marginTop: 12 }}>Tools</p>
+          {navTools.map(item => {
+            const Icon = item.icon;
+            return (
+              <Link key={item.href} to={item.href} className={`sidebar-link ${isActive(item.href) ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
                 <Icon size={16} />
                 {item.name}
               </Link>

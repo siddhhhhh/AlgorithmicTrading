@@ -9,3 +9,5 @@ python-dotenv
 feedparser
 pnsea
 stealthkit
+scipy
+google-generativeai

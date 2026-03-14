@@ -16,6 +16,30 @@ load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
 app = Flask(__name__)
 CORS(app)
 
+# ── Register Quant Engine Blueprints ──────────────────────────────────────────
+try:
+    from engines.greeks import greeks_bp
+    from engines.iv_engine import iv_bp
+    from engines.gex_engine import gex_bp
+    from engines.oi_engine import oi_bp
+    from engines.maxpain_engine import maxpain_bp
+    from engines.volume_engine import volume_bp
+    from engines.flow_engine import flow_bp
+    from engines.strategy_engine import strategy_bp
+    from engines.volatility_engine import volatility_bp
+    from engines.heatmap_engine import heatmap_bp
+    from engines.futures_engine import futures_bp
+    from engines.signal_engine import signal_bp
+    from engines.ai_analyst import ai_analyst_bp
+
+    for bp in [greeks_bp, iv_bp, gex_bp, oi_bp, maxpain_bp, volume_bp,
+               flow_bp, strategy_bp, volatility_bp, heatmap_bp, futures_bp,
+               signal_bp, ai_analyst_bp]:
+        app.register_blueprint(bp)
+    print("  ✓ All quant engine blueprints registered")
+except Exception as e:
+    print(f"  ⚠ Engine blueprint import error: {e}")
+
 # ── Groq client (lazy — only created when AI endpoints are called) ────────────
 _groq_client = None
 GROQ_MODEL = "llama-3.3-70b-versatile"
@@ -472,12 +496,12 @@ def _load_from_disk(cache_key):
         return None
 
 
-def fetch_nse_option_chain(symbol, is_index):
+def fetch_nse_option_chain(symbol, is_index, expiry_date=None):
     """Fetch option chain from NSE using pnsea library.
     pnsea returns: (DataFrame, expiry_dates_list, underlying_value_float)
     We return:     (df, expiry_dates, underlying_value, cached_at_or_None)
     """
-    cache_key = f"{symbol}_{is_index}"
+    cache_key = f"{symbol}_{is_index}_{expiry_date or 'default'}"
 
     # Check in-memory cache first
     with _nse_cache_lock:
@@ -491,11 +515,11 @@ def fetch_nse_option_chain(symbol, is_index):
     last_error = None
     for attempt in range(2):
         try:
-            print(f"  → pnsea attempt {attempt + 1}: {symbol} ({'index' if is_index else 'equity'})...")
+            print(f"  → pnsea attempt {attempt + 1}: {symbol} ({'index' if is_index else 'equity'}) expiry={expiry_date}...")
             if is_index:
-                result = nse.options.option_chain(symbol)
+                result = nse.options.option_chain(symbol, expiry_date=expiry_date)
             else:
-                result = nse.equityOptions.option_chain(symbol)
+                result = nse.equityOptions.option_chain(symbol, expiry_date=expiry_date)
 
             # pnsea returns: (DataFrame, expiry_dates_list, underlying_value_float)
             df = result[0]
@@ -552,9 +576,9 @@ def get_options(symbol):
 
         is_index = sym in NSE_INDEX_SYMBOLS or sym in ("NIFTY", "BANKNIFTY", "FINNIFTY", "MIDCPNIFTY", "NIFTYNXT50")
 
-        print(f"\n📊 Fetching option chain for {sym} (is_index={is_index})")
+        print(f"\n📊 Fetching option chain for {sym} (is_index={is_index}, expiry={expiry_param})")
         try:
-            result = fetch_nse_option_chain(sym, is_index)
+            result = fetch_nse_option_chain(sym, is_index, expiry_date=expiry_param)
             df = result[0]
             expiry_dates = result[1]
             underlying_value = result[2]
@@ -578,6 +602,31 @@ def get_options(symbol):
             expiry_dates = []
 
         target_expiry = expiry_param if expiry_param and expiry_param in expiry_dates else (expiry_dates[0] if expiry_dates else None)
+
+        # Debug: log DataFrame columns and shape
+        print(f"  📋 DataFrame columns: {list(df.columns)}")
+        print(f"  📋 DataFrame shape: {df.shape}")
+        print(f"  📋 Target expiry: {target_expiry}")
+
+        # Filter DataFrame by selected expiry if column exists
+        if target_expiry and 'expiryDate' in df.columns:
+            df_filtered = df[df['expiryDate'] == target_expiry]
+            if len(df_filtered) > 0:
+                print(f"  ✓ Filtered to {len(df_filtered)} rows for expiry {target_expiry}")
+                df = df_filtered
+            else:
+                # Try matching without exact string match (pnsea may format dates differently)
+                print(f"  ⚠ No rows matched expiry '{target_expiry}', unique expiries in df: {df['expiryDate'].unique()[:5]}")
+                # Try partial matching
+                for exp_val in df['expiryDate'].unique():
+                    if target_expiry in str(exp_val) or str(exp_val) in target_expiry:
+                        df_filtered = df[df['expiryDate'] == exp_val]
+                        if len(df_filtered) > 0:
+                            print(f"  ✓ Partial match: filtered to {len(df_filtered)} rows for expiry {exp_val}")
+                            df = df_filtered
+                            break
+        elif target_expiry:
+            print(f"  ⚠ No 'expiryDate' column found in DataFrame — returning all rows")
 
         # Transform pnsea DataFrame to frontend format
         # pnsea columns: strikePrice, CE_openInterest, CE_changeinOpenInterest, CE_impliedVolatility,
