@@ -37,8 +37,8 @@ def _get_market_context(symbol):
         if iv > 0:
             ivs.append(iv)
 
-    pcr = round(total_pe_oi / max(total_ce_oi, 1), 4)
-    avg_iv = round(sum(ivs) / len(ivs), 2) if ivs else 0
+    pcr = round(float(total_pe_oi) / max(float(total_ce_oi), 1.0), 4)
+    avg_iv = round(float(sum(ivs)) / len(ivs), 2) if ivs else 0.0
 
     return {
         "symbol": symbol,
@@ -178,4 +178,68 @@ Keep it under 100 words total. Be precise and professional."""
         "value": value,
         "symbol": symbol,
         "explanation": explanation,
+    })
+
+@ai_analyst_bp.route("/api/ai/generate-strategy", methods=["POST", "GET"])
+def generate_strategy():
+    """AI generates an executable Python trading strategy based on a description."""
+    if request.method == "POST":
+        data = request.json or {}
+        prompt_text = data.get("prompt", "")
+        llm = data.get("llm", "gemini")
+    else:
+        prompt_text = request.args.get("prompt", "")
+        llm = request.args.get("llm", "gemini")
+
+    if not prompt_text:
+        return jsonify({"error": "No prompt provided"}), 400
+
+    system_prompt = f"""You are an expert quantitative developer.
+Create a Python algorithmic trading strategy based on this request: "{prompt_text}"
+
+The strategy function MUST be named `custom_strategy` and take a single pandas DataFrame `df` as input.
+The DataFrame `df` contains historical data with standard columns (e.g., 'Open', 'High', 'Low', 'Close', 'Volume').
+You must return a Python dictionary with:
+1. 'signals': A pandas Series of the same length as `df`, containing 1 (Buy), -1 (Sell), or 0 (Hold).
+2. 'name': A string with a short name for the strategy.
+
+Return ONLY the Python code block. Do not include explanations.
+
+Example output format:
+```python
+import pandas as pd
+import numpy as np
+
+def custom_strategy(df):
+    # Strategy logic here
+    df['SMA_20'] = df['Close'].rolling(window=20).mean()
+    df['SMA_50'] = df['Close'].rolling(window=50).mean()
+    
+    signals = pd.Series(0, index=df.index)
+    signals[df['SMA_20'] > df['SMA_50']] = 1
+    signals[df['SMA_20'] < df['SMA_50']] = -1
+    
+    return {{
+        'signals': signals,
+        'name': 'SMA Crossover'
+    }}
+```
+"""
+
+    if llm == "gemini":
+        raw = _call_gemini(system_prompt, 2000)
+    else:
+        raw = _call_groq(system_prompt, 2000)
+
+    # Clean the output to just get the Python code
+    code = raw
+    if "```python" in code:
+        code = code.split("```python")[1].split("```")[0].strip()
+    elif "```" in code:
+        code = code.split("```")[1].split("```")[0].strip()
+
+    return jsonify({
+        "prompt": prompt_text,
+        "code": code,
+        "llmUsed": llm
     })

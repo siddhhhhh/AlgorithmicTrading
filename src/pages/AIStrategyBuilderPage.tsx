@@ -3,7 +3,7 @@ import DashboardLayout from '../components/layout/DashboardLayout';
 import {
     Brain, Sparkles, Send, Zap, RefreshCw, BarChart3, Save,
     Lightbulb, ChevronRight, AlertTriangle, CheckCircle, Target,
-    TrendingUp, Shield, Settings, ArrowRight, Copy, BookOpen, Cpu
+    TrendingUp, Shield, Settings, ArrowRight, Copy, BookOpen, Cpu, Code2, Check
 } from 'lucide-react';
 import {
     WarpTunnel, NeuralNetwork3D, Hologram3D, CrystalPrism,
@@ -59,6 +59,10 @@ const AIStrategyBuilderPage: React.FC = () => {
     const [optimizing, setOptimizing] = useState(false);
     const [activeStrategy, setActiveStrategy] = useState<Strategy | null>(null);
     const [explanation, setExplanation] = useState<Explanation | null>(null);
+    const [generatedCode, setGeneratedCode] = useState<string | null>(null);
+    const [codeLoading, setCodeLoading] = useState(false);
+    const [codeError, setCodeError] = useState<string | null>(null);
+    const [codeCopied, setCodeCopied] = useState(false);
     const chatEndRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -145,6 +149,32 @@ const AIStrategyBuilderPage: React.FC = () => {
 
     const copyStrategy = () => {
         if (activeStrategy) navigator.clipboard.writeText(JSON.stringify(activeStrategy, null, 2));
+    };
+
+    const generateCode = async () => {
+        if (!activeStrategy || codeLoading) return;
+        setCodeLoading(true); setCodeError(null); setGeneratedCode(null);
+        try {
+            const strategyPrompt = `${activeStrategy.strategyName}: ${activeStrategy.description}. ` +
+                `Indicators: ${activeStrategy.indicators.map(i => i.name).join(', ')}. ` +
+                `Entry: ${activeStrategy.entryRules.map(r => r.description).join('; ')}. ` +
+                `Exit: ${activeStrategy.exitRules.map(r => r.description).join('; ')}. ` +
+                `Timeframe: ${activeStrategy.timeframe}. Market: ${activeStrategy.marketType}.`;
+            const res = await fetch(`${API}/api/ai/generate-strategy`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ prompt: strategyPrompt, llm: 'groq' }),
+            });
+            const data = await res.json();
+            if (data.error) throw new Error(data.error);
+            if (data.code?.includes('AI analysis unavailable')) throw new Error(data.code);
+            setGeneratedCode(data.code);
+            setChat(prev => [...prev, { role: 'ai', content: '🐍 Python code generated! Check the code panel below the strategy details.', timestamp: new Date() }]);
+        } catch (e: any) { setCodeError(e.message || 'Failed to generate code'); }
+        finally { setCodeLoading(false) }
+    };
+
+    const copyCode = () => {
+        if (generatedCode) { navigator.clipboard.writeText(generatedCode); setCodeCopied(true); setTimeout(() => setCodeCopied(false), 2000); }
     };
 
     /* ── Confidence bar helper ───────────────────────────── */
@@ -245,7 +275,7 @@ const AIStrategyBuilderPage: React.FC = () => {
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, alignItems: 'start' }}>
 
                         {/* ── LEFT: Chat Interface ── */}
-                        <div className="ai-card" style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 340px)', animation: 'aiFadeUp 0.6s ease 0.2s both' }}>
+                        <div className="ai-card" style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 240px)', position: 'sticky', top: 120, animation: 'aiFadeUp 0.6s ease 0.2s both' }}>
                             <div style={{ padding: '16px 18px', borderBottom: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', gap: 8 }}>
                                 <Cpu size={14} color={C.teal} />
                                 <span style={{ fontSize: 13, fontWeight: 700 }}>AI Conversation</span>
@@ -346,7 +376,7 @@ const AIStrategyBuilderPage: React.FC = () => {
                         </div>
 
                         {/* ── RIGHT: Strategy Display ── */}
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, animation: 'aiFadeUp 0.6s ease 0.3s both' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, minHeight: 'calc(100vh - 340px)', animation: 'aiFadeUp 0.6s ease 0.3s both' }}>
                             {!activeStrategy ? (
                                 <CrystalPrism intensity={0.8} style={{ borderRadius: 16 }}>
                                     <div className="ai-card" style={{
@@ -409,6 +439,9 @@ const AIStrategyBuilderPage: React.FC = () => {
                                                 <button className="ai-btn ai-btn-secondary" onClick={copyStrategy} style={{ fontSize: 11 }}>
                                                     <Copy size={12} /> Copy JSON
                                                 </button>
+                                                <button className="ai-btn ai-btn-primary" onClick={generateCode} disabled={codeLoading} style={{ fontSize: 11 }}>
+                                                    {codeLoading ? <RefreshCw size={12} style={{ animation: 'aiSpin 1s linear infinite' }} /> : <Code2 size={12} />} {codeLoading ? 'Generating…' : '🐍 Get Python Code'}
+                                                </button>
                                                 <button className="ai-btn ai-btn-secondary" style={{ fontSize: 11, marginLeft: 'auto' }}>
                                                     <Save size={12} /> Save
                                                 </button>
@@ -416,8 +449,8 @@ const AIStrategyBuilderPage: React.FC = () => {
                                         </div>
                                     </CrystalPrism>
 
-                                    {/* Strategy Details — scrollable */}
-                                    <div className="ai-scroll" style={{ maxHeight: 'calc(100vh - 560px)', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                                    {/* Strategy Details — scrollable (now naturally expands) */}
+                                    <div className="ai-scroll" style={{ display: 'flex', flexDirection: 'column', gap: 10, paddingBottom: 40 }}>
 
                                         {/* Indicators */}
                                         <Hologram3D color={C.teal} style={{ borderRadius: 16 }}>
@@ -553,6 +586,49 @@ const AIStrategyBuilderPage: React.FC = () => {
                                                     )}
                                                 </div>
                                             </CrystalPrism>
+                                        )}
+
+                                        {/* Generated Python Code */}
+                                        {codeError && (
+                                            <div className="ai-card" style={{ padding: '14px 16px', background: '#fef2f2', border: '1px solid #fecaca' }}>
+                                                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                                                    <AlertTriangle size={14} color="#dc2626" style={{ marginTop: 1, flexShrink: 0 }} />
+                                                    <div>
+                                                        <div style={{ fontSize: 12, fontWeight: 700, color: '#dc2626', marginBottom: 2 }}>Code Generation Failed</div>
+                                                        <div style={{ fontSize: 11, color: '#b91c1c', lineHeight: 1.4 }}>{codeError}</div>
+                                                        {codeError.includes('quota') && (
+                                                            <div style={{ marginTop: 4, fontSize: 10, color: '#b91c1c' }}>💡 Try again in a few minutes or check your API key quota.</div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+                                        {generatedCode && (
+                                            <div className="ai-card" style={{ padding: 0, overflow: 'hidden', animation: 'aiFadeUp 0.5s ease' }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px', background: C.bg2, borderBottom: `1px solid ${C.border}` }}>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                                        <Code2 size={13} color={C.teal} />
+                                                        <span style={{ fontSize: 12, fontWeight: 700 }}>Generated Python Code</span>
+                                                        <CheckCircle size={11} color={C.teal} />
+                                                    </div>
+                                                    <button className="ai-btn ai-btn-secondary" onClick={copyCode} style={{ fontSize: 10, padding: '4px 10px' }}>
+                                                        {codeCopied ? <><Check size={10} /> Copied!</> : <><Copy size={10} /> Copy</>}
+                                                    </button>
+                                                </div>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 16px', background: '#1e293b', borderBottom: '1px solid #334155' }}>
+                                                    <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#ef4444' }} />
+                                                    <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#f59e0b' }} />
+                                                    <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#10b981' }} />
+                                                    <span style={{ fontSize: 10, color: '#94a3b8', marginLeft: 6, fontFamily: 'monospace' }}>strategy.py</span>
+                                                </div>
+                                                <pre style={{
+                                                    margin: 0, padding: '16px 20px', background: '#0f172a', color: '#e2e8f0',
+                                                    fontSize: 11.5, lineHeight: 1.6, fontFamily: "'Fira Code', 'Cascadia Code', 'JetBrains Mono', monospace",
+                                                    overflowX: 'auto', maxHeight: 350,
+                                                }}>
+                                                    <code>{generatedCode}</code>
+                                                </pre>
+                                            </div>
                                         )}
 
                                         {/* Parameters */}

@@ -1,5 +1,6 @@
 from flask import Flask, jsonify, request
 from flask_cors import CORS
+from flask_socketio import SocketIO, emit
 import yfinance as yf
 import pandas as pd
 import numpy as np
@@ -7,14 +8,21 @@ import requests
 import json
 import sqlite3
 import os
+import time
 from datetime import datetime, timedelta, timezone
 from dotenv import load_dotenv
+from cachetools import TTLCache
 
 # Load .env before anything else
 load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
 
 app = Flask(__name__)
 CORS(app)
+
+# ── SocketIO instance ─────────────────────────────────────────────────────────
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading',
+                    ping_timeout=20, ping_interval=10)
+print("  ✓ SocketIO initialized (threading async mode)")
 
 # ── Register Quant Engine Blueprints ──────────────────────────────────────────
 try:
@@ -426,6 +434,121 @@ _pnsea_lock = threading.Lock()
 _nse_cache = {}
 _nse_cache_lock = threading.Lock()
 NSE_CACHE_TTL = 180  # 3 minutes
+
+# ══════════════════════════════════════════════════════════════════════════════
+# DIRECT NSE SESSION (for indices, VIX, movers — supplements pnsea)
+# ══════════════════════════════════════════════════════════════════════════════
+
+NSE_HEADERS = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
+                  'AppleWebKit/537.36 (KHTML, like Gecko) '
+                  'Chrome/120.0.0.0 Safari/537.36',
+    'Accept-Language': 'en-US,en;q=0.9',
+    'Accept-Encoding': 'gzip, deflate, br',
+    'Referer': 'https://www.nseindia.com/',
+    'Accept': 'application/json, text/plain, */*',
+}
+
+_nse_direct_session = requests.Session()
+_nse_direct_session.headers.update(NSE_HEADERS)
+_nse_session_initialized = False
+_nse_session_lock = threading.Lock()
+
+def init_nse_direct_session():
+    """Initialize NSE direct session with cookies."""
+    global _nse_session_initialized
+    with _nse_session_lock:
+        try:
+            _nse_direct_session.get('https://www.nseindia.com', timeout=10)
+            _nse_session_initialized = True
+            print("  ✓ NSE direct session initialized")
+        except Exception as e:
+            print(f"  ⚠ NSE direct session init failed: {e}")
+
+def nse_direct_get(url, retries=3):
+    """GET from NSE with retry + session refresh."""
+    global _nse_session_initialized
+    for attempt in range(retries):
+        try:
+            if not _nse_session_initialized:
+                init_nse_direct_session()
+            resp = _nse_direct_session.get(url, timeout=8)
+            if resp.status_code == 401 or resp.status_code == 403:
+                _nse_session_initialized = False
+                init_nse_direct_session()
+                continue
+            try:
+                return resp.json()
+            except ValueError:
+                print(f"  ⚠ JSON decode error from NSE {url}")
+                return {}
+        except Exception as e:
+            if attempt == retries - 1:
+                raise e
+            socketio.sleep(1)
+
+# ── TTL Caches for NSE direct data ────────────────────────────────────────────
+_indices_cache = TTLCache(maxsize=1, ttl=2)    # 2s cache for indices
+_movers_cache = TTLCache(maxsize=2, ttl=5)     # 5s cache for movers
+
+def fetch_nse_indices():
+    """Fetch all NSE indices + VIX from allIndices API."""
+    cache_key = 'indices'
+    if cache_key in _indices_cache:
+        return _indices_cache[cache_key]
+    try:
+        data = nse_direct_get('https://www.nseindia.com/api/allIndices')
+        indices = []
+        vix_value = 0
+        vix_change = 0
+        if data and 'data' in data:
+            for idx in data['data']:
+                sym = idx.get('indexSymbol', '')
+                if sym in ('NIFTY 50', 'NIFTY BANK', 'NIFTY FINANCIAL SERVICES', 'NIFTY MIDCAP 50', 'NIFTY IT'):
+                    indices.append({
+                        'name': idx.get('index', sym),
+                        'symbol': sym,
+                        'value': idx.get('last', 0),
+                        'change': idx.get('variation', 0),
+                        'changePercent': idx.get('percentChange', 0),
+                        'open': idx.get('open', 0),
+                        'high': idx.get('high', 0),
+                        'low': idx.get('low', 0),
+                        'prevClose': idx.get('previousClose', 0),
+                    })
+                if sym == 'INDIA VIX':
+                    vix_value = idx.get('last', 0)
+                    vix_change = idx.get('variation', 0)
+        result = {'indices': indices, 'vix': vix_value, 'vix_change': vix_change}
+        _indices_cache[cache_key] = result
+        return result
+    except Exception as e:
+        print(f"  ⚠ NSE indices fetch failed: {e}")
+        return {'indices': [], 'vix': 0, 'vix_change': 0}
+
+def fetch_nse_movers(direction='gainers'):
+    """Fetch top gainers or losers from NSE."""
+    cache_key = direction
+    if cache_key in _movers_cache:
+        return _movers_cache[cache_key]
+    try:
+        url = f'https://www.nseindia.com/api/live-analysis-variations?index={direction}'
+        data = nse_direct_get(url)
+        movers = []
+        if data and 'NIFTY' in data:
+            for item in data['NIFTY']['data'][:10]:
+                movers.append({
+                    'symbol': item.get('symbol', ''),
+                    'ltp': item.get('ltp', 0),
+                    'change': item.get('netPrice', 0),
+                    'changePercent': item.get('perChange', 0),
+                    'volume': item.get('tradedQuantity', 0),
+                })
+        _movers_cache[cache_key] = movers
+        return movers
+    except Exception as e:
+        print(f"  ⚠ NSE movers ({direction}) fetch failed: {e}")
+        return []
 
 # Disk cache directory for persistent storage across restarts / after-hours
 _NSE_DISK_CACHE_DIR = _os.path.join(_os.path.dirname(__file__), ".nse_cache")
@@ -1352,12 +1475,339 @@ def ai_optimize():
         return jsonify({"error": f"Optimize failed: {str(e)}"}), 500
 
 
+# ══════════════════════════════════════════════════════════════════════════════
+# WEBSOCKET REAL-TIME BROADCAST ENGINE
+# ══════════════════════════════════════════════════════════════════════════════
+
+# ── State for options broadcast ───────────────────────────────────────────────
+_ws_selected_symbol = 'NIFTY'
+_ws_previous_options_data = None
+
+# ── Smart Alert Engine ────────────────────────────────────────────────────────
+def check_alerts(current_data, previous_data):
+    """Detect trading-relevant alerts from options data changes."""
+    alerts = []
+    if not previous_data or not current_data:
+        return alerts
+
+    curr_summary = current_data.get('summary', {})
+    prev_summary = previous_data.get('summary', {})
+
+    # PCR crossing thresholds
+    curr_pcr = curr_summary.get('pcr', 0)
+    prev_pcr = prev_summary.get('pcr', 0)
+    if prev_pcr and curr_pcr:
+        if prev_pcr >= 0.8 and curr_pcr < 0.8:
+            alerts.append({'type': 'PCR', 'severity': 'high',
+                           'message': f'PCR dropped below 0.8 → Bearish signal ({curr_pcr:.3f})',
+                           'timestamp': datetime.now().isoformat()})
+        if prev_pcr <= 1.2 and curr_pcr > 1.2:
+            alerts.append({'type': 'PCR', 'severity': 'high',
+                           'message': f'PCR crossed above 1.2 → Bullish signal ({curr_pcr:.3f})',
+                           'timestamp': datetime.now().isoformat()})
+        if prev_pcr >= 1.0 and curr_pcr < 1.0:
+            alerts.append({'type': 'PCR', 'severity': 'medium',
+                           'message': f'PCR dropped below 1.0 → Sentiment shift ({curr_pcr:.3f})',
+                           'timestamp': datetime.now().isoformat()})
+        if prev_pcr <= 1.0 and curr_pcr > 1.0:
+            alerts.append({'type': 'PCR', 'severity': 'medium',
+                           'message': f'PCR crossed above 1.0 → Sentiment shift ({curr_pcr:.3f})',
+                           'timestamp': datetime.now().isoformat()})
+
+    # Max OI shifts
+    curr_max_ce = curr_summary.get('maxCallOI', {}).get('strike', 0)
+    prev_max_ce = prev_summary.get('maxCallOI', {}).get('strike', 0)
+    if curr_max_ce and prev_max_ce and curr_max_ce != prev_max_ce:
+        alerts.append({'type': 'OI_SHIFT', 'severity': 'medium',
+                       'message': f'Max Call OI shifted from {prev_max_ce} to {curr_max_ce} (resistance moved)',
+                       'timestamp': datetime.now().isoformat()})
+
+    curr_max_pe = curr_summary.get('maxPutOI', {}).get('strike', 0)
+    prev_max_pe = prev_summary.get('maxPutOI', {}).get('strike', 0)
+    if curr_max_pe and prev_max_pe and curr_max_pe != prev_max_pe:
+        alerts.append({'type': 'OI_SHIFT', 'severity': 'medium',
+                       'message': f'Max Put OI shifted from {prev_max_pe} to {curr_max_pe} (support moved)',
+                       'timestamp': datetime.now().isoformat()})
+
+    return alerts
+
+
+# ── Latency helper ────────────────────────────────────────────────────────────
+def calculate_fetch_latency(start_time):
+    return round((time.time() - start_time) * 1000, 1)
+
+
+# ── Market Data Broadcast (2s cycle) ──────────────────────────────────────────
+def market_broadcast_loop():
+    """Background task: push indices/VIX/movers every 2 seconds."""
+    print("  🔴 Market broadcast loop started")
+    # Initialize NSE direct session first
+    try:
+        init_nse_direct_session()
+    except Exception:
+        pass
+
+    while True:
+        try:
+            t0 = time.time()
+
+            # Fetch from NSE
+            indices_data = fetch_nse_indices()
+            t_indices = time.time()
+
+            gainers = fetch_nse_movers('gainers')
+            losers = fetch_nse_movers('loosers')
+            t_movers = time.time()
+
+            # Calculate market breadth from indices
+            market_session = get_market_session()
+
+            payload = {
+                'indices': indices_data.get('indices', []),
+                'vix': indices_data.get('vix', 0),
+                'vix_change': indices_data.get('vix_change', 0),
+                'topGainers': gainers,
+                'topLosers': losers,
+                'timestamp': datetime.now().isoformat(),
+                'latency': {
+                    'nse_fetch_ms': calculate_fetch_latency(t0),
+                    'indices_ms': round((t_indices - t0) * 1000, 1),
+                    'movers_ms': round((t_movers - t_indices) * 1000, 1),
+                    'total_ms': calculate_fetch_latency(t0),
+                    'broadcast_ts': time.time(),
+                },
+                'marketSession': market_session,
+            }
+
+            socketio.emit('market_update', payload)
+            socketio.sleep(2)  # 2-second refresh cycle
+
+        except Exception as e:
+            print(f"  ⚠ Market broadcast error: {e}")
+            socketio.sleep(5)
+
+
+def get_market_session():
+    """Detect current market session."""
+    now = datetime.now()
+    day = now.weekday()  # 0=Mon, 6=Sun
+    h, m = now.hour, now.minute
+    mins = h * 60 + m
+
+    if day >= 5:  # Weekend
+        return {'status': 'closed', 'label': 'CLOSED', 'color': '#ef4444', 'next': 'Monday 9:00 AM'}
+    elif mins < 9 * 60:  # Before 9 AM
+        return {'status': 'closed', 'label': 'CLOSED', 'color': '#ef4444', 'next': '9:00 AM Pre-market'}
+    elif mins < 9 * 60 + 15:  # 9:00 - 9:15
+        return {'status': 'pre_market', 'label': 'PRE-MARKET', 'color': '#f59e0b', 'next': '9:15 AM Market Open'}
+    elif mins < 15 * 60 + 30:  # 9:15 - 15:30
+        return {'status': 'open', 'label': 'MARKET OPEN', 'color': '#10b981', 'next': '3:30 PM Close'}
+    elif mins < 16 * 60:  # 15:30 - 16:00
+        return {'status': 'post_market', 'label': 'POST-MARKET', 'color': '#f97316', 'next': '4:00 PM Session End'}
+    else:
+        return {'status': 'closed', 'label': 'CLOSED', 'color': '#ef4444', 'next': 'Tomorrow 9:00 AM'}
+
+
+# ── Options Chain Broadcast (5s cycle) ────────────────────────────────────────
+def options_broadcast_loop():
+    """Background task: push full processed options chain every 5 seconds."""
+    global _ws_previous_options_data
+    print("  🔵 Options broadcast loop started")
+    socketio.sleep(3)  # Let market broadcast warm up first
+
+    while True:
+        try:
+            t0 = time.time()
+            sym = _ws_selected_symbol
+
+            is_index = sym in NSE_INDEX_SYMBOLS or sym in ('NIFTY', 'BANKNIFTY', 'FINNIFTY', 'MIDCPNIFTY')
+            result = fetch_nse_option_chain(sym, is_index)
+            df, expiry_dates, underlying_value, cached_at = result[0], result[1], result[2], result[3] if len(result) > 3 else None
+
+            t_fetch = time.time()
+
+            # Process into structured format
+            S = safe_float(underlying_value) or 0
+            processed_data = []
+            total_ce_oi = 0
+            total_pe_oi = 0
+            total_ce_vol = 0
+            total_pe_vol = 0
+            max_ce_oi = {'strike': 0, 'oi': 0}
+            max_pe_oi = {'strike': 0, 'oi': 0}
+            call_oi_map = {}
+            put_oi_map = {}
+
+            for _, row in df.iterrows():
+                strike = int(row.get('strikePrice', 0))
+                if strike == 0:
+                    continue
+
+                ce_oi = safe_float(row.get('CE_openInterest')) or 0
+                pe_oi = safe_float(row.get('PE_openInterest')) or 0
+                ce_vol = safe_float(row.get('CE_totalTradedVolume')) or 0
+                pe_vol = safe_float(row.get('PE_totalTradedVolume')) or 0
+
+                total_ce_oi += ce_oi
+                total_pe_oi += pe_oi
+                total_ce_vol += ce_vol
+                total_pe_vol += pe_vol
+                call_oi_map[strike] = ce_oi
+                put_oi_map[strike] = pe_oi
+
+                if ce_oi > max_ce_oi['oi']:
+                    max_ce_oi = {'strike': strike, 'oi': ce_oi}
+                if pe_oi > max_pe_oi['oi']:
+                    max_pe_oi = {'strike': strike, 'oi': pe_oi}
+
+                # Moneyness
+                if S > 0:
+                    ratio = abs(strike - S) / S
+                    moneyness = 'ATM' if ratio <= 0.02 else ('ITM' if strike < S else 'OTM')
+                else:
+                    moneyness = 'OTM'
+
+                processed_data.append({
+                    'strike': strike,
+                    'expiry': row.get('expiryDate', ''),
+                    'moneyness': moneyness,
+                    'CE': {
+                        'ltp': safe_float(row.get('CE_lastPrice')) or 0,
+                        'change': safe_float(row.get('CE_change')) or 0,
+                        'pChange': safe_float(row.get('CE_pChange')) or 0,
+                        'oi': ce_oi,
+                        'oiChange': safe_float(row.get('CE_changeinOpenInterest')) or 0,
+                        'volume': ce_vol,
+                        'iv': safe_float(row.get('CE_impliedVolatility')) or 0,
+                        'bidQty': safe_float(row.get('CE_bidQty')) or 0,
+                        'bidPrice': safe_float(row.get('CE_bidprice')) or 0,
+                        'askPrice': safe_float(row.get('CE_askPrice')) or 0,
+                        'askQty': safe_float(row.get('CE_askQty')) or 0,
+                    },
+                    'PE': {
+                        'ltp': safe_float(row.get('PE_lastPrice')) or 0,
+                        'change': safe_float(row.get('PE_change')) or 0,
+                        'pChange': safe_float(row.get('PE_pChange')) or 0,
+                        'oi': pe_oi,
+                        'oiChange': safe_float(row.get('PE_changeinOpenInterest')) or 0,
+                        'volume': pe_vol,
+                        'iv': safe_float(row.get('PE_impliedVolatility')) or 0,
+                        'bidQty': safe_float(row.get('PE_bidQty')) or 0,
+                        'bidPrice': safe_float(row.get('PE_bidprice')) or 0,
+                        'askPrice': safe_float(row.get('PE_askPrice')) or 0,
+                        'askQty': safe_float(row.get('PE_askQty')) or 0,
+                    },
+                })
+
+            t_process = time.time()
+
+            # PCR & summary
+            pcr = round(total_pe_oi / total_ce_oi, 4) if total_ce_oi > 0 else 0
+            pcr_sentiment = 'Bullish' if pcr > 1.2 else ('Bearish' if pcr < 0.8 else 'Neutral')
+
+            # Max Pain calculation
+            all_strikes = sorted(set(row['strike'] for row in processed_data))
+            max_pain_strike = 0
+            min_pain = float('inf')
+            for test_strike in all_strikes:
+                pain = 0
+                for s in all_strikes:
+                    ce_o = call_oi_map.get(s, 0)
+                    pe_o = put_oi_map.get(s, 0)
+                    if test_strike > s:
+                        pain += ce_o * (test_strike - s)
+                    elif test_strike < s:
+                        pain += pe_o * (s - test_strike)
+                if pain < min_pain:
+                    min_pain = pain
+                    max_pain_strike = test_strike
+
+            # Expected Move (ATM straddle)
+            expected_move = 0
+            if S > 0 and processed_data:
+                atm_row = min(processed_data, key=lambda r: abs(r['strike'] - S))
+                expected_move = round(atm_row['CE']['ltp'] + atm_row['PE']['ltp'], 2)
+
+            options_payload = {
+                'symbol': sym,
+                'underlyingValue': S,
+                'expiries': expiry_dates[:12] if expiry_dates else [],
+                'selectedExpiry': expiry_dates[0] if expiry_dates else '',
+                'data': processed_data,
+                'summary': {
+                    'totalCeOI': total_ce_oi,
+                    'totalPeOI': total_pe_oi,
+                    'totalCeVolume': total_ce_vol,
+                    'totalPeVolume': total_pe_vol,
+                    'pcr': pcr,
+                    'pcrSentiment': pcr_sentiment,
+                    'maxCallOI': max_ce_oi,
+                    'maxPutOI': max_pe_oi,
+                    'maxPain': max_pain_strike,
+                    'expectedMove': expected_move,
+                },
+                'timestamp': datetime.now().isoformat(),
+                'cachedAt': cached_at,
+                'latency': {
+                    'fetch_ms': round((t_fetch - t0) * 1000, 1),
+                    'process_ms': round((t_process - t_fetch) * 1000, 1),
+                    'total_ms': calculate_fetch_latency(t0),
+                },
+            }
+
+            socketio.emit('options_update', options_payload)
+
+            # Check alerts
+            alerts = check_alerts(options_payload, _ws_previous_options_data)
+            for alert in alerts:
+                socketio.emit('alert', alert)
+            _ws_previous_options_data = options_payload
+
+            socketio.sleep(5)  # 5-second refresh for options
+
+        except Exception as e:
+            print(f"  ⚠ Options broadcast error: {e}")
+            socketio.sleep(10)
+
+
+# ── SocketIO Event Handlers ───────────────────────────────────────────────────
+
+@socketio.on('connect')
+def handle_connect():
+    print(f"  🟢 Client connected: {request.sid}")
+    emit('connection_status', {'status': 'connected', 'timestamp': datetime.now().isoformat()})
+
+@socketio.on('disconnect')
+def handle_disconnect():
+    print(f"  🔴 Client disconnected: {request.sid}")
+
+@socketio.on('ping_latency')
+def handle_ping():
+    emit('pong_latency', {'server_ts': time.time()})
+
+@socketio.on('change_symbol')
+def handle_change_symbol(data):
+    global _ws_selected_symbol
+    new_symbol = data.get('symbol', 'NIFTY').upper()
+    _ws_selected_symbol = new_symbol
+    print(f"  🔄 Options symbol changed to: {new_symbol}")
+    emit('symbol_changed', {'symbol': new_symbol})
+
+
 # ── /api-market (legacy compat) ───────────────────────────────────────────────
 @app.route("/api-market")
 def legacy_market():
     return get_market_data()
 
-if __name__ == "__main__":
-    print("🚀 AlgoForge Python Backend starting on http://localhost:5001")
-    app.run(port=5001, debug=True)
 
+# ══════════════════════════════════════════════════════════════════════════════
+# STARTUP
+# ══════════════════════════════════════════════════════════════════════════════
+
+if __name__ == "__main__":
+    print("🚀 AlgoForge Python Backend (SocketIO) starting on http://localhost:5001")
+    # Start background broadcast threads
+    socketio.start_background_task(market_broadcast_loop)
+    socketio.start_background_task(options_broadcast_loop)
+    # Use socketio.run instead of app.run for WebSocket support
+    socketio.run(app, host='0.0.0.0', port=5001, debug=False, use_reloader=False)

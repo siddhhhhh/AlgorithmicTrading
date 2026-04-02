@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import ReactDOM from 'react-dom';
 import DashboardLayout from '../components/layout/DashboardLayout';
 import { useData } from '../contexts/DataContext';
+import LiveOptionsChain from '../components/OptionsChain/LiveOptionsChain';
 import {
   Eye, RefreshCw, Search, AlertCircle, TrendingUp, TrendingDown,
   Zap, Target, BarChart3, ChevronDown
@@ -38,6 +39,7 @@ const OptionChainPage: React.FC = () => {
   const [searchQ, setSearchQ] = useState('');
   const [autoRefresh, setAutoRefresh] = useState(false);
   const [showAllStrikes, setShowAllStrikes] = useState(false);
+  const [liveMode, setLiveMode] = useState(true); // Default to live WebSocket mode
   const tableContainerRef = useRef<HTMLDivElement>(null);
   const atmRowRef = useRef<HTMLTableRowElement>(null);
 
@@ -190,6 +192,34 @@ const OptionChainPage: React.FC = () => {
 
         <WaveformLine color="#8b5cf6" amplitude={12} frequency={4} speed={3} height={30}
           style={{ borderRadius: 10, marginBottom: 16, background: '#0f172a' }} />
+
+        {/* ═══ MODE TOGGLE ═══ */}
+        <div style={{ display: 'flex', gap: 8, marginBottom: 16, alignItems: 'center' }}>
+          <button onClick={() => setLiveMode(true)} style={{
+            padding: '8px 18px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer',
+            background: liveMode ? 'rgba(16,185,129,0.15)' : 'rgba(255,255,255,0.03)',
+            border: `1px solid ${liveMode ? 'rgba(16,185,129,0.3)' : 'rgba(255,255,255,0.06)'}`,
+            color: liveMode ? '#10b981' : '#64748b', display: 'flex', alignItems: 'center', gap: 5,
+            transition: 'all 0.2s',
+          }}>
+            <Zap size={12} /> LIVE (WebSocket)
+          </button>
+          <button onClick={() => setLiveMode(false)} style={{
+            padding: '8px 18px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer',
+            background: !liveMode ? 'rgba(139,92,246,0.15)' : 'rgba(255,255,255,0.03)',
+            border: `1px solid ${!liveMode ? 'rgba(139,92,246,0.3)' : 'rgba(255,255,255,0.06)'}`,
+            color: !liveMode ? '#a78bfa' : '#64748b', display: 'flex', alignItems: 'center', gap: 5,
+            transition: 'all 0.2s',
+          }}>
+            <RefreshCw size={12} /> Legacy (REST)
+          </button>
+        </div>
+
+        {/* ═══ LIVE MODE ═══ */}
+        {liveMode ? (
+          <LiveOptionsChain />
+        ) : (
+        <>
 
         {/* ═══ CONTROLS ═══ */}
         <div style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center', animation: 'fadeUp 0.4s ease both' }}>
@@ -487,6 +517,8 @@ const OptionChainPage: React.FC = () => {
                 : 'NSE data could not be loaded. Please try refreshing in a few seconds.'}
             </p>
           </div>
+        )}
+        </>
         )}
       </div>
     </DashboardLayout>

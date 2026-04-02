@@ -3,6 +3,9 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { DataProvider } from './contexts/DataContext';
+import LiveStatusBar from './components/LiveStatusBar';
+import LatencyMonitor from './components/LatencyMonitor';
+import AlertSystem from './components/AlertSystem';
 
 // Page Components
 import LandingPage from './pages/LandingPage';
@@ -61,39 +64,46 @@ function App() {
       <AuthProvider>
         <DataProvider>
           <Router>
-            <Routes>
-              {/* Public Routes */}
-              <Route path="/" element={<LandingPage />} />
-              <Route path="/login" element={<PublicRoute><LoginPage /></PublicRoute>} />
-              <Route path="/register" element={<PublicRoute><RegisterPage /></PublicRoute>} />
+            {/* Persistent overlays */}
+            <LiveStatusBar />
+            <LatencyMonitor />
+            <AlertSystem />
 
-              {/* Protected Routes */}
-              <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
-              <Route path="/market" element={<ProtectedRoute><MarketPage /></ProtectedRoute>} />
-              <Route path="/strategy-builder" element={<ProtectedRoute><StrategyBuilderPage /></ProtectedRoute>} />
-              <Route path="/ai-strategy" element={<ProtectedRoute><AIStrategyBuilderPage /></ProtectedRoute>} />
-              <Route path="/broker-integration" element={<ProtectedRoute><BrokerIntegrationPage /></ProtectedRoute>} />
-              <Route path="/backtesting" element={<ProtectedRoute><BacktestingPage /></ProtectedRoute>} />
-              <Route path="/portfolio" element={<ProtectedRoute><Portfolio /></ProtectedRoute>} />
-              <Route path="/option-chain" element={<ProtectedRoute><OptionChainPage /></ProtectedRoute>} />
-              <Route path="/news-insights" element={<ProtectedRoute><NewsInsightsPage /></ProtectedRoute>} />
-              <Route path="/gamma-exposure" element={<ProtectedRoute><GammaDashboard /></ProtectedRoute>} />
-              <Route path="/oi-analysis" element={<ProtectedRoute><OIDashboard /></ProtectedRoute>} />
-              <Route path="/max-pain" element={<ProtectedRoute><MaxPainDashboard /></ProtectedRoute>} />
-              <Route path="/volatility" element={<ProtectedRoute><VolatilityDashboard /></ProtectedRoute>} />
-              <Route path="/strategy-payoff" element={<ProtectedRoute><StrategyBuilderDashboard /></ProtectedRoute>} />
-              <Route path="/options-flow" element={<ProtectedRoute><OptionsFlowDashboard /></ProtectedRoute>} />
-              <Route path="/futures" element={<ProtectedRoute><FuturesDashboard /></ProtectedRoute>} />
-              <Route path="/heatmap" element={<ProtectedRoute><HeatmapDashboard /></ProtectedRoute>} />
-              <Route path="/quant-signals" element={<ProtectedRoute><QuantSignalsDashboard /></ProtectedRoute>} />
-              <Route path="/risk-management" element={<ProtectedRoute><RiskManagementPage /></ProtectedRoute>} />
-              <Route path="/learning" element={<ProtectedRoute><LearningHubPage /></ProtectedRoute>} />
-              <Route path="/community" element={<ProtectedRoute><CommunityPage /></ProtectedRoute>} />
-              <Route path="/billing" element={<ProtectedRoute><BillingPage /></ProtectedRoute>} />
+            <div style={{ paddingTop: 32 }}>
+              <Routes>
+                {/* Public Routes */}
+                <Route path="/" element={<LandingPage />} />
+                <Route path="/login" element={<PublicRoute><LoginPage /></PublicRoute>} />
+                <Route path="/register" element={<PublicRoute><RegisterPage /></PublicRoute>} />
 
-              {/* Catch all */}
-              <Route path="*" element={<Navigate to="/" />} />
-            </Routes>
+                {/* Protected Routes */}
+                <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
+                <Route path="/market" element={<ProtectedRoute><MarketPage /></ProtectedRoute>} />
+                <Route path="/strategy-builder" element={<ProtectedRoute><StrategyBuilderPage /></ProtectedRoute>} />
+                <Route path="/ai-strategy" element={<ProtectedRoute><AIStrategyBuilderPage /></ProtectedRoute>} />
+                <Route path="/broker-integration" element={<ProtectedRoute><BrokerIntegrationPage /></ProtectedRoute>} />
+                <Route path="/backtesting" element={<ProtectedRoute><BacktestingPage /></ProtectedRoute>} />
+                <Route path="/portfolio" element={<ProtectedRoute><Portfolio /></ProtectedRoute>} />
+                <Route path="/option-chain" element={<ProtectedRoute><OptionChainPage /></ProtectedRoute>} />
+                <Route path="/news-insights" element={<ProtectedRoute><NewsInsightsPage /></ProtectedRoute>} />
+                <Route path="/gamma-exposure" element={<ProtectedRoute><GammaDashboard /></ProtectedRoute>} />
+                <Route path="/oi-analysis" element={<ProtectedRoute><OIDashboard /></ProtectedRoute>} />
+                <Route path="/max-pain" element={<ProtectedRoute><MaxPainDashboard /></ProtectedRoute>} />
+                <Route path="/volatility" element={<ProtectedRoute><VolatilityDashboard /></ProtectedRoute>} />
+                <Route path="/strategy-payoff" element={<ProtectedRoute><StrategyBuilderDashboard /></ProtectedRoute>} />
+                <Route path="/options-flow" element={<ProtectedRoute><OptionsFlowDashboard /></ProtectedRoute>} />
+                <Route path="/futures" element={<ProtectedRoute><FuturesDashboard /></ProtectedRoute>} />
+                <Route path="/heatmap" element={<ProtectedRoute><HeatmapDashboard /></ProtectedRoute>} />
+                <Route path="/quant-signals" element={<ProtectedRoute><QuantSignalsDashboard /></ProtectedRoute>} />
+                <Route path="/risk-management" element={<ProtectedRoute><RiskManagementPage /></ProtectedRoute>} />
+                <Route path="/learning" element={<ProtectedRoute><LearningHubPage /></ProtectedRoute>} />
+                <Route path="/community" element={<ProtectedRoute><CommunityPage /></ProtectedRoute>} />
+                <Route path="/billing" element={<ProtectedRoute><BillingPage /></ProtectedRoute>} />
+
+                {/* Catch all */}
+                <Route path="*" element={<Navigate to="/" />} />
+              </Routes>
+            </div>
           </Router>
         </DataProvider>
       </AuthProvider>

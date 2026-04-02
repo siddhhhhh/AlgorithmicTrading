@@ -1,5 +1,6 @@
 Flask
 flask-cors
+flask-socketio==5.3.6
 yfinance
 pandas
 numpy
@@ -10,4 +11,5 @@ feedparser
 pnsea
 stealthkit
 scipy
+cachetools==5.3.2
 google-generativeai
